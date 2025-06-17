@@ -42,58 +42,55 @@ def generate_prompt():
 
         # --- Montagem da Instrução para a IA ---
         
-        # Bloco de informações do Personagem 2 (só é adicionado se ele existir)
         character_2_block = ""
         if character_count == '2':
             character_2_block = f"""
         **CHARACTER 2 DATA:**
-        - Concept (in Portuguese): "{character2_concept_pt}"
-        - Dialogue (in Portuguese): "{dialogue2_text_pt}"
+        - Concept: "{character2_concept_pt}"
+        - Dialogue: "{dialogue2_text_pt}"
         """
 
-        # A instrução principal agora agrupa os dados por personagem
+        cctv_instruction = ""
+        if "CCTV" in camera_style_text:
+            cctv_instruction = "For the Scene description, you MUST describe the shot as being 'from a high corner of the room, slightly tilted down, creating a sense of distant, detached surveillance'."
+
         instruction = f"""
-        You are an expert prompt engineer for AI video generators, specialized in creating dynamic scenes.
+        You are an expert prompt engineer. Your mission is to assemble a hyper-detailed prompt based on the user's data, following a strict structural recipe.
 
-        **1. SCENE BRIEF:**
-        - General Location Concept (in Portuguese): "{location_concept_pt}"
-        - Shared Accent for all Characters: "{accent_text}"
-        - Use Slang in Dialogue: "{use_slang_text}"
-        - Desired Atmosphere: "{atmosphere_text}"
-        - Date of Scene: "{date_text}"
-        - Camera Style: "{camera_style_text}"
-        - Visual Style: "{visual_style_text}"
+        **1. INGREDIENTS (Source of Truth):**
+        
+        **SCENE INGREDIENTS:**
+        - Location Concept: "{location_concept_pt}"
+        - Atmosphere: "{atmosphere_text}"
+        - Date: "{date_text}"
+        - Camera Style Keywords: "{camera_style_text}"
+        - Visual Style Keywords: "{visual_style_text}"
 
-        **2. CHARACTER DATA (Unambiguous Grouping):**
-
+        **DIALOGUE RULES:**
+        - Use Slang: "{use_slang_text}"
+        - Shared Accent: "{accent_text}"
+        
         **CHARACTER 1 DATA:**
-        - Concept (in Portuguese): "{character_concept_pt}"
-        - Dialogue (in Portuguese): "{dialogue_text_pt}"
+        - Concept: "{character_concept_pt}"
+        - Dialogue: "{dialogue_text_pt}"
         {character_2_block}
 
-        **3. YOUR TASK - VERY IMPORTANT RULES:**
-        - Create a final prompt in ENGLISH, strictly following the output format below.
-        - Translate and MASSIVELY EXPAND upon all Portuguese concepts into hyper-detailed English descriptions.
-        - For EVERY character provided, you MUST apply the MANDATORY CHARACTER DETAIL CHECKLIST.
+        **2. ASSEMBLY RECIPE (Follow Step-by-Step):**
 
-        # <<< AQUI ESTÁ A MUDANÇA PRINCIPAL PARA CORRIGIR O BUG DAS GÍRIAS >>>
-        - **STRICT DIALOGUE RULES (Your most important task - Follow with zero deviation):**
-          - **IF 'Use Slang' is 'Não':** You are FORBIDDEN from altering the original dialogue. You MUST transfer the user's provided text VERBATIM, exactly as written. Any modification is a failure.
-          - **IF 'Use Slang' is 'Sim':** You MUST creatively rewrite and rephrase the dialogue for ALL characters to include authentic slang and colloquialisms that match the specified '{accent_text}'.
-        
-        **4. MANDATORY CHARACTER DETAIL CHECKLIST (Apply to EACH character individually):**
-        Invent and include specific details for ALL of the following: Age and Ethnicity, Facial Structure, Eyes, Hair, Skin Details, Physique, Clothing, and Defining Expression.
+        You WILL now generate the final prompt in ENGLISH using the 5 labels below.
 
-        **5. OUTPUT FORMAT (Use this exact structure):**
+        - **For 'Visuals:':** Creatively combine 'Atmosphere' and 'Visual Style Keywords'. DO NOT repeat these keywords later.
+        - **For 'Scene:':** Translate and expand the 'Location Concept' into a hyper-detailed paragraph. {cctv_instruction}
+        - **For 'Character 1:' and 'Character 2:':** For EACH character, you MUST generate a new block with TWO sub-headings: '- Description:' and '- Dialogue:'.
+            - Under '- Description:', you MUST apply the 'MANDATORY CHARACTER DETAIL CHECKLIST' to the character's 'Concept'.
+            - Under '- Dialogue:', you MUST place the character's corresponding 'Dialogue'. If 'Use Slang' is 'Sim', rephrase it with the specified accent. If 'Não', use it VERBATIM. This structure is non-negotiable.
+        - **For 'Action:':** Describe ONLY the physical actions and interactions between characters. DO NOT include the dialogue text here, as it is already defined under each character.
+        - **For 'Technical:':** List the 'Camera Style Keywords' and append the standard commands: ', no captions, clean video, no music.'
 
-        **Visuals:** [Combine Visual Style and Atmosphere here. Be descriptive.]
-        **Scene:** [A hyper-detailed description of the location.]
-        **Character 1:** [A hyper-detailed description of Character 1 from the checklist.]
-        **Character 2:** [IF Character 2 exists, a hyper-detailed description of Character 2 from the checklist. Omit this line if there is only one character.]
-        **Action:** [A detailed description of the character(s) physical actions and their dialogue exchange. Ensure Character 1 speaks Character 1's dialogue, and Character 2 speaks Character 2's dialogue. The dialogue itself must be in Brazilian Portuguese.]
-        **Technical:** [Combine Camera Style and other technical commands, and you MUST append: ', no captions, clean video, no music.']
+        **MANDATORY CHARACTER DETAIL CHECKLIST (Apply to EACH character's Description):**
+        Invent and include: Age and Ethnicity, Facial Structure, Eyes, Hair, Skin Details, Physique, Clothing, and Defining Expression.
 
-        Now, generate the final, structured, hyper-detailed prompt.
+        **3. FINAL OUTPUT (Generate Now):**
         """
 
         model = genai.GenerativeModel('gemini-1.5-flash')
@@ -106,4 +103,4 @@ def generate_prompt():
         return jsonify({'error': 'Ocorreu um erro no servidor ao gerar o prompt.'}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=80)

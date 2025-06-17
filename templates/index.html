@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Geração de Prompts</title>
-    <style>/* Seu CSS continua o mesmo, não precisa mudar */
+    <style>
+        /* Seu CSS continua o mesmo, não precisa mudar */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
         :root { --bg-color: #121212; --surface-color: #1e1e1e; --primary-color: #bb86fc; --primary-variant: #3700b3; --text-color: #e1e1e1; --border-color: #333333; }
         body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 2rem; }
@@ -85,7 +86,6 @@
                     <option value="Intimate, handheld 'selfie-style' shot, slight camera shake">Selfie / Íntimo</option>
                     <option value="Stable, locked-down tripod shot, perfectly level">Câmera Fixa / Tripé</option>
                     <option value="Sweeping cinematic drone shot, wide-angle, smooth motion">Drone Cinematográfico</option>
-                    <option value="First-person POV shot, showing exactly what the character sees">Câmera POV (1ª Pessoa)</option>
                     <option value="Shaky, chaotic, found-footage perspective, urgent movement">Found Footage / Ação</option>
                     <option value="Fixed CCTV security camera angle, top-down, slightly distorted">Câmera de Segurança</option>
                 </select>
@@ -114,8 +114,8 @@
             <div id="resultado"></div>
         </div>
     </div>
+
     <script>
-        // Todo o seu JavaScript continua o mesmo, não precisa mudar
         function handleCharacterCountChange() {
             const char2Fields = document.getElementById('character-2-fields');
             if (document.querySelector('input[name="character_count"]:checked').value === '2') {
@@ -132,6 +132,7 @@
             dateInput.value = `${month.charAt(0).toUpperCase() + month.slice(1)} de ${year}`;
         });
         async function gerar() {
+            // ... a função gerar continua a mesma
             const generateButton = document.getElementById('generate-button');
             const loader = document.getElementById('loader');
             const resultWrapper = document.getElementById('result-wrapper');
@@ -178,13 +179,36 @@
                 generateButton.innerText = 'Gerar Prompt';
             }
         }
+        
+        // <<< NOVA FUNÇÃO 'COPIAR' À PROVA DE FALHAS >>>
         function copiar() {
-            const texto = document.getElementById('resultado').innerText;
-            navigator.clipboard.writeText(texto).then(() => {
-                const copyButton = document.getElementById('copy-button');
+            const textoParaCopiar = document.getElementById('resultado').innerText;
+            const copyButton = document.getElementById('copy-button');
+
+            // Cria um textarea temporário e invisível
+            const textarea = document.createElement('textarea');
+            textarea.value = textoParaCopiar;
+            textarea.style.position = 'absolute';
+            textarea.style.left = '-9999px'; // Move para fora da tela
+            document.body.appendChild(textarea);
+            
+            // Seleciona e copia o texto
+            textarea.select();
+            try {
+                document.execCommand('copy');
                 copyButton.innerText = 'Copiado!';
-                setTimeout(() => { copyButton.innerText = 'Copiar'; }, 2000);
-            });
+            } catch (err) {
+                console.error('Erro ao copiar texto: ', err);
+                copyButton.innerText = 'Erro!';
+            }
+
+            // Remove o textarea temporário
+            document.body.removeChild(textarea);
+
+            // Reseta o texto do botão depois de 2 segundos
+            setTimeout(() => {
+                copyButton.innerText = 'Copiar';
+            }, 2000);
         }
     </script>
 </body>
