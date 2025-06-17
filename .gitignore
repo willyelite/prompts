@@ -1,0 +1,5 @@
+# Arquivos de ambiente com senhas e chaves
+.env
+
+# Pasta de cache do Python
+__pycache__/

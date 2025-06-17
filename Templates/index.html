@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geração de Prompts</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --primary-color: #bb86fc;
+            --primary-variant: #3700b3;
+            --text-color: #e1e1e1;
+            --border-color: #333333;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 2rem; }
+        .container { max-width: 900px; margin: auto; }
+        h1 { text-align: center; color: var(--primary-color); margin-bottom: 2rem; }
+        .form-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+        @media (min-width: 768px) { .form-grid { grid-template-columns: 1fr 1fr; gap: 1.5rem; } }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group-radio { display: flex; flex-direction: column; }
+        .radio-options { display: flex; align-items: center; gap: 1.5rem; margin-top: 0.5rem; }
+        .radio-options label { margin-bottom: 0; }
+        .radio-options input[type="radio"] { margin-right: 0.5rem; }
+        #other-language-input { margin-left: -1rem; }
+        .full-width { grid-column: 1 / -1; }
+        label { margin-bottom: 0.5rem; font-weight: 500; }
+        input, select, textarea { background-color: var(--surface-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-size: 1rem; width: 100%; box-sizing: border-box; }
+        input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-color); border-color: var(--primary-color); }
+        textarea { resize: vertical; }
+        #character, #dialogue { height: 60px; }
+        .main-button { grid-column: 1 / -1; padding: 15px; background-color: var(--primary-color); color: #000; border: none; border-radius: 8px; font-size: 1.2rem; font-weight: 700; cursor: pointer; transition: background-color 0.3s, transform 0.1s; }
+        .main-button:hover { background-color: #a76aef; }
+        .main-button:active { transform: scale(0.99); }
+        .main-button:disabled { background-color: #555; cursor: not-allowed; }
+        .result-wrapper { margin-top: 2rem; background-color: var(--surface-color); border-radius: 8px; padding: 1.5rem; position: relative; display: none; }
+        .result-wrapper h2 { margin-top: 0; }
+        #resultado { white-space: pre-wrap; line-height: 1.7; }
+        #copy-button { position: absolute; top: 1rem; right: 1rem; background: var(--primary-variant); color: var(--text-color); border: none; border-radius: 5px; padding: 8px 12px; cursor: pointer; }
+        #copy-button:hover { background: #4a00e0; }
+        .loader { display: none; text-align: center; padding: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Geração de Prompts</h1>
+        <form class="form-grid" onsubmit="event.preventDefault(); gerar();">
+            <div class="form-group full-width">
+                <label for="character">Descrição do Personagem</label>
+                <textarea id="character" placeholder="Ex: Homem de 40 anos, cansado, de terno, com uma maleta na mão"></textarea>
+            </div>
+            
+            <div class="form-group full-width">
+                <label for="dialogue">Fala do Personagem</label>
+                <textarea id="dialogue" placeholder="Ex: Eu não aguento mais um dia neste escritório."></textarea>
+            </div>
+            <div class="form-group-radio full-width" style="margin-top: -0.5rem;">
+                <label>Idioma da Fala</label>
+                <div class="radio-options">
+                    <label><input type="radio" name="language" value="Português" checked onchange="handleLanguageChange()"> Português</label>
+                    <label><input type="radio" name="language" value="other" onchange="handleLanguageChange()"> Outro:</label>
+                    <input type="text" id="other-language-input" placeholder="Digite o idioma" disabled>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="slang">Usar Gírias?</label>
+                <select id="slang">
+                    <option value="Não">Não</option>
+                    <option value="Sim">Sim</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="accent">Sotaque</label>
+                <input type="text" id="accent" placeholder="Ex: Carioca, Nordestino, Britânico">
+            </div>
+
+            <div class="form-group">
+                <label for="location">Local da Cena</label>
+                <input type="text" id="location" placeholder="Ex: Em um elevador lotado">
+            </div>
+            <div class="form-group">
+                <label for="date">Data na Cena</label>
+                <input type="text" id="date" placeholder="Mês e Ano">
+            </div>
+            <div class="form-group">
+                <label for="camera_style">Estilo da Câmera</label>
+                <select id="camera_style">
+                    <option value="8-second handheld 'selfie-style' video">Selfie (Handheld)</option>
+                    <option value="static tripod shot">Câmera Estática (Tripé)</option>
+                    <option value="cinematic drone shot">Drone Cinematográfico</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="visual_style">Estilo Visual</label>
+                <select id="visual_style">
+                    <option value="photorealistic, cinematic, 8K">Fotorealista / Cinema</option>
+                    <option value="3D animation, Pixar style">Animação 3D (Pixar)</option>
+                    <option value="2D anime style">Desenho 2D (Anime)</option>
+                </select>
+            </div>
+            <div class="form-group full-width">
+                <label for="atmosphere">Atmosfera (Adjetivos)</label>
+                <input type="text" id="atmosphere" placeholder="Ex: Tensa, melancólica, caótica">
+            </div>
+            <button id="generate-button" class="main-button" type="submit">Gerar Prompt</button>
+        </form>
+
+        <div class="loader" id="loader">Carregando...</div>
+        <div class="result-wrapper" id="result-wrapper">
+            <h2>Prompt Gerado</h2>
+            <button id="copy-button" onclick="copiar()">Copiar</button>
+            <div id="resultado"></div>
+        </div>
+    </div>
+
+    <script>
+        function handleLanguageChange() {
+            const otherRadio = document.querySelector('input[name="language"][value="other"]');
+            const otherInput = document.getElementById('other-language-input');
+            if (otherRadio.checked) {
+                otherInput.disabled = false;
+                otherInput.focus();
+            } else {
+                otherInput.disabled = true;
+                otherInput.value = '';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', (event) => {
+            const dateInput = document.getElementById('date');
+            const now = new Date();
+            const month = now.toLocaleString('pt-BR', { month: 'long' });
+            const year = now.getFullYear();
+            dateInput.value = `${month.charAt(0).toUpperCase() + month.slice(1)} de ${year}`;
+            handleLanguageChange(); // Garante o estado inicial correto
+        });
+
+        async function gerar() {
+            const generateButton = document.getElementById('generate-button');
+            const loader = document.getElementById('loader');
+            const resultWrapper = document.getElementById('result-wrapper');
+            
+            generateButton.disabled = true;
+            generateButton.innerText = 'Gerando...';
+            loader.style.display = 'block';
+            resultWrapper.style.display = 'none';
+            
+            // Coleta do idioma
+            const langRadio = document.querySelector('input[name="language"]:checked');
+            let languageValue = langRadio.value;
+            if (languageValue === 'other') {
+                languageValue = document.getElementById('other-language-input').value;
+            }
+
+            const payload = {
+                character: document.getElementById('character').value,
+                dialogue: document.getElementById('dialogue').value,
+                language: languageValue,
+                slang: document.getElementById('slang').value,
+                accent: document.getElementById('accent').value,
+                location: document.getElementById('location').value,
+                date: document.getElementById('date').value,
+                camera_style: document.getElementById('camera_style').value,
+                visual_style: document.getElementById('visual_style').value,
+                atmosphere: document.getElementById('atmosphere').value,
+            };
+
+            // Restante da função é igual...
+            try {
+                const response = await fetch('/generate-prompt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                if (!response.ok) { throw new Error(`Erro ${response.status}`); }
+                const data = await response.json();
+                if (data.error) {
+                    document.getElementById('resultado').innerText = `Erro: ${data.error}`;
+                } else {
+                    document.getElementById('resultado').innerText = data.prompt;
+                }
+            } catch (error) {
+                document.getElementById('resultado').innerText = `Erro na comunicação: ${error.message}`;
+            } finally {
+                loader.style.display = 'none';
+                resultWrapper.style.display = 'block';
+                generateButton.disabled = false;
+                generateButton.innerText = 'Gerar Prompt';
+            }
+        }
+
+        function copiar() {
+            const texto = document.getElementById('resultado').innerText;
+            navigator.clipboard.writeText(texto).then(() => {
+                const copyButton = document.getElementById('copy-button');
+                copyButton.innerText = 'Copiado!';
+                setTimeout(() => { copyButton.innerText = 'Copiar'; }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
