@@ -19,7 +19,6 @@ def index():
 def generate_prompt():
     try:
         data = request.json
-        # Coletando todos os dados, incluindo os novos
         character_concept_pt = data.get('character')
         dialogue_text_pt = data.get('dialogue')
         language_text = data.get('language')
@@ -31,54 +30,46 @@ def generate_prompt():
         visual_style_text = data.get('visual_style')
         atmosphere_text = data.get('atmosphere')
 
-        # Validação mais completa
         required_fields = [character_concept_pt, dialogue_text_pt, language_text, location_concept_pt, accent_text]
         if not all(required_fields):
             return jsonify({'error': 'Os campos de personagem, fala, idioma, local e sotaque são obrigatórios.'}), 400
 
-        # --- Montagem da Instrução para a IA (VERSÃO COM MAIS NUANCES) ---
+        # --- Montagem da Instrução para a IA (VERSÃO COM REGRAS CONDICIONAIS) ---
         instruction = f"""
         You are an expert prompt engineer for AI video generators. Your mission is to convert user concepts into a structured, HYPER-DETAILED, and evocative prompt in ENGLISH.
 
         **1. CORE IDEAS FROM USER:**
         - Character Concept (in Portuguese): "{character_concept_pt}"
         - Location Concept (in Portuguese): "{location_concept_pt}"
-        - Dialogue Line (to understand emotion): "{dialogue_text_pt}"
+        - Original Dialogue: "{dialogue_text_pt}"
         - Dialogue Language: "{language_text}"
-        - Desired Atmosphere: "{atmosphere_text}"
         - Use Slang: "{use_slang_text}"
         - Character's Accent: "{accent_text}"
-
-        **2. TECHNICAL & STYLISTIC PARAMETERS:**
+        - Desired Atmosphere: "{atmosphere_text}"
         - Date of Scene: "{date_text}"
         - Camera Style: "{camera_style_text}"
         - Visual Style: "{visual_style_text}"
 
-        **3. YOUR TASK:**
+        **2. YOUR TASK - VERY IMPORTANT RULES:**
         - Create a final prompt in ENGLISH, structured with the labels below.
-        - Your descriptions must be MASSIVELY EXPANDED AND EXTREMELY DETAILED.
-        - The Character's description, clothing, and mannerisms MUST be heavily influenced by their specified Accent ('{accent_text}'). Invent culturally and regionally appropriate details.
-        - If 'Use Slang' is 'Sim', the character's described action and expression should have a more informal, colloquial, and street-smart feel. If 'Não', they should be more standard or formal.
-        - DO NOT include the verbatim dialogue. Instead, describe the CHARACTER'S ACTION AND EXPRESSION as they speak, reflecting the emotion, language, and accent.
+        - Descriptions for Character and Scene must be MASSIVELY EXPANDED AND EXTREMELY DETAILED.
+        - The Character's description, clothing, and mannerisms MUST be heavily influenced by their specified Accent ('{accent_text}').
+
+        - **STRICT DIALOGUE RULES (Follow Precisely):**
+          - The 'Action' section of the prompt must contain the character's final speech.
+          - **IF 'Use Slang' is 'Sim':** You MUST rephrase the 'Original Dialogue' ('{dialogue_text_pt}') to include authentic slang and colloquialisms that match the specified 'Accent' ('{accent_text}') and 'Dialogue Language' ('{language_text}'). The result should be a natural-sounding, slang-filled version of the original idea.
+          - **IF 'Use Slang' is 'Não':** You MUST use the 'Original Dialogue' ('{dialogue_text_pt}') VERBATIM. Do not change a single word.
+          - The final prompt MUST explicitly state the language and accent, and then the dialogue (either rephrased or verbatim). The final format inside the 'Action' section must be: `...speaking in {language_text} with a {accent_text} accent, and says: "[final dialogue text here]"`.
+
         - The final output MUST follow this exact format:
 
         **Visuals:** [Combine Visual Style and Atmosphere here]
         **Scene:** [A hyper-detailed description of the location]
-        **Character:** [A hyper-detailed description of the character, deeply informed by their accent and slang preference]
-        **Action:** [A detailed description of the character's action, reflecting the emotion of their dialogue, their accent, and slang preference]
+        **Character:** [A hyper-detailed description of the character, deeply informed by their accent]
+        **Action:** [A detailed description of the character's physical action, followed by the explicit language, accent, and the final dialogue as per the rules above]
         **Technical:** [Combine Camera Style and other technical commands]
 
-        **4. MANDATORY CHARACTER DETAIL CHECKLIST (Invent details for ALL, guided by the accent):**
-        - **Age and Ethnicity:** Be specific.
-        - **Facial Structure & Expression:** Jawline, cheekbones, and a defining expression that matches their accent/persona.
-        - **Eyes:** Color, shape, expression.
-        - **Hair:** Color, style, texture, condition.
-        - **Skin Details:** Complexion, texture, scars, marks, etc.
-        - **Physique / Body Type:** Posture and build that align with the persona.
-        - **Clothing:** Describe every item, ensuring the style is authentic to the character's accent and culture.
-        - **Defining Mannerism:** A characteristic gesture or tic heavily influenced by their accent ('{accent_text}').
-
-        Now, generate the final, structured, hyper-detailed prompt.
+        Now, generate the final, structured, hyper-detailed prompt based on all these rules.
         """
 
         model = genai.GenerativeModel('gemini-1.5-flash')
