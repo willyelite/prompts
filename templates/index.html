@@ -5,14 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Geração de Prompts</title>
     <style>
-        /* Seu CSS continua o mesmo, não precisa mudar */
+        /* CSS completo e responsivo. Nenhuma mudança necessária aqui. */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
         :root { --bg-color: #121212; --surface-color: #1e1e1e; --primary-color: #bb86fc; --primary-variant: #3700b3; --text-color: #e1e1e1; --border-color: #333333; }
-        body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 2rem; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 1rem; } /* Padding para mobile */
         .container { max-width: 900px; margin: auto; }
-        h1 { text-align: center; color: var(--primary-color); margin-bottom: 2rem; }
-        .form-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
-        @media (min-width: 768px) { .form-grid { grid-template-columns: 1fr 1fr; } }
+        h1 { text-align: center; color: var(--primary-color); margin-bottom: 2rem; font-size: 1.8rem; }
+        .form-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+        @media (min-width: 768px) {
+            body { padding: 2rem; }
+            .form-grid { grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+            h1 { font-size: 2.5rem; }
+        }
         .form-group, .form-group-radio { display: flex; flex-direction: column; }
         .radio-options { display: flex; align-items: center; gap: 1.5rem; margin-top: 0.5rem; }
         .full-width { grid-column: 1 / -1; }
@@ -28,6 +32,7 @@
     </style>
 </head>
 <body>
+<h2 style="text-align: center; color: #aaa; margin-top: -1.5rem; font-weight: 400;">Prompts gerados nesta sessão: {{ hits }}</h2>
     <div class="container">
         <h1>Geração de Prompts</h1>
         <form class="form-grid" onsubmit="event.preventDefault(); gerar();">
@@ -85,8 +90,8 @@
                 <select id="camera_style">
                     <option value="Intimate, handheld 'selfie-style' shot, slight camera shake">Selfie / Íntimo</option>
                     <option value="Stable, locked-down tripod shot, perfectly level">Câmera Fixa / Tripé</option>
+                    <option value="First-person POV shot, showing exactly what the character sees">Câmera POV (1ª Pessoa)</option>
                     <option value="Sweeping cinematic drone shot, wide-angle, smooth motion">Drone Cinematográfico</option>
-                    <option value="Shaky, chaotic, found-footage perspective, urgent movement">Found Footage / Ação</option>
                     <option value="Fixed CCTV security camera angle, top-down, slightly distorted">Câmera de Segurança</option>
                 </select>
             </div>
@@ -98,7 +103,6 @@
                     <option value="Classic 2D cartoon style, hand-drawn look, bold outlines">Desenho Animado (2D)</option>
                     <option value="Vintage 1990s home video, VHS look, slight static, aspect ratio 4:3">Vídeo Caseiro Anos 90</option>
                     <option value="Gritty, urban, neon-noir aesthetic, high contrast, moody lighting">Urbano / Neon Noir</option>
-                    <option value="Black and white documentary style, grainy, high-contrast">Documentário P&B</option>
                 </select>
             </div>
             <div class="form-group full-width">
@@ -114,7 +118,6 @@
             <div id="resultado"></div>
         </div>
     </div>
-
     <script>
         function handleCharacterCountChange() {
             const char2Fields = document.getElementById('character-2-fields');
@@ -132,7 +135,6 @@
             dateInput.value = `${month.charAt(0).toUpperCase() + month.slice(1)} de ${year}`;
         });
         async function gerar() {
-            // ... a função gerar continua a mesma
             const generateButton = document.getElementById('generate-button');
             const loader = document.getElementById('loader');
             const resultWrapper = document.getElementById('result-wrapper');
@@ -180,19 +182,14 @@
             }
         }
         
-        // <<< NOVA FUNÇÃO 'COPIAR' À PROVA DE FALHAS >>>
         function copiar() {
             const textoParaCopiar = document.getElementById('resultado').innerText;
             const copyButton = document.getElementById('copy-button');
-
-            // Cria um textarea temporário e invisível
             const textarea = document.createElement('textarea');
             textarea.value = textoParaCopiar;
             textarea.style.position = 'absolute';
-            textarea.style.left = '-9999px'; // Move para fora da tela
+            textarea.style.left = '-9999px';
             document.body.appendChild(textarea);
-            
-            // Seleciona e copia o texto
             textarea.select();
             try {
                 document.execCommand('copy');
@@ -201,11 +198,7 @@
                 console.error('Erro ao copiar texto: ', err);
                 copyButton.innerText = 'Erro!';
             }
-
-            // Remove o textarea temporário
             document.body.removeChild(textarea);
-
-            // Reseta o texto do botão depois de 2 segundos
             setTimeout(() => {
                 copyButton.innerText = 'Copiar';
             }, 2000);
