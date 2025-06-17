@@ -34,7 +34,12 @@ def generate_prompt():
         if not all(required_fields):
             return jsonify({'error': 'Os campos de personagem, fala, idioma, local e sotaque são obrigatórios.'}), 400
 
-        # --- Montagem da Instrução para a IA (VERSÃO COM REGRAS CONDICIONAIS) ---
+        # --- MUDANÇA 1: Lógica para especificar o idioma no backend ---
+        # Se o idioma recebido do frontend for "Português", ele será trocado por "Brazilian Portuguese" antes de ser enviado para a IA.
+        if language_text == 'Português':
+            language_text = 'Brazilian Portuguese'
+        
+        # --- Montagem da Instrução para a IA (VERSÃO FINAL) ---
         instruction = f"""
         You are an expert prompt engineer for AI video generators. Your mission is to convert user concepts into a structured, HYPER-DETAILED, and evocative prompt in ENGLISH.
 
@@ -53,13 +58,12 @@ def generate_prompt():
         **2. YOUR TASK - VERY IMPORTANT RULES:**
         - Create a final prompt in ENGLISH, structured with the labels below.
         - Descriptions for Character and Scene must be MASSIVELY EXPANDED AND EXTREMELY DETAILED.
-        - The Character's description, clothing, and mannerisms MUST be heavily influenced by their specified Accent ('{accent_text}').
+        - The Character's description MUST be heavily influenced by their specified Accent ('{accent_text}').
 
         - **STRICT DIALOGUE RULES (Follow Precisely):**
-          - The 'Action' section of the prompt must contain the character's final speech.
-          - **IF 'Use Slang' is 'Sim':** You MUST rephrase the 'Original Dialogue' ('{dialogue_text_pt}') to include authentic slang and colloquialisms that match the specified 'Accent' ('{accent_text}') and 'Dialogue Language' ('{language_text}'). The result should be a natural-sounding, slang-filled version of the original idea.
+          - **IF 'Use Slang' is 'Sim':** You MUST rephrase the 'Original Dialogue' ('{dialogue_text_pt}') to include authentic slang and colloquialisms that match the specified 'Accent' ('{accent_text}') and 'Dialogue Language' ('{language_text}').
           - **IF 'Use Slang' is 'Não':** You MUST use the 'Original Dialogue' ('{dialogue_text_pt}') VERBATIM. Do not change a single word.
-          - The final prompt MUST explicitly state the language and accent, and then the dialogue (either rephrased or verbatim). The final format inside the 'Action' section must be: `...speaking in {language_text} with a {accent_text} accent, and says: "[final dialogue text here]"`.
+          - The final prompt MUST explicitly state the language and accent, and then the dialogue. The format inside the 'Action' section must be: `...speaking in {language_text} with a {accent_text} accent, and says: "[final dialogue text here]"`.
 
         - The final output MUST follow this exact format:
 
@@ -67,7 +71,9 @@ def generate_prompt():
         **Scene:** [A hyper-detailed description of the location]
         **Character:** [A hyper-detailed description of the character, deeply informed by their accent]
         **Action:** [A detailed description of the character's physical action, followed by the explicit language, accent, and the final dialogue as per the rules above]
-        **Technical:** [Combine Camera Style and other technical commands]
+        
+        # --- MUDANÇA 2: Adicionar comandos técnicos fixos ---
+        **Technical:** [Combine Camera Style and other technical commands, and you MUST append the following keywords at the end: ', no captions, clean video, no music.']
 
         Now, generate the final, structured, hyper-detailed prompt based on all these rules.
         """
