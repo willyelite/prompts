@@ -50,6 +50,7 @@ def index():
 
 @app.route('/generate-prompt', methods=['POST'])
 def generate_prompt():
+    print("\n--- PASSO 1: Rota /generate-prompt recebida com sucesso. ---")
     try:
         data = request.json
         
@@ -74,19 +75,8 @@ def generate_prompt():
         slang_text = data.get('slang')
         
         is_two_character_scene = bool(p2_desc and p2_dialogue)
-
-        # Validação
-        if not all([p1_desc, p1_dialogue]):
-            return jsonify({'error': 'A descrição e a fala do Personagem 1 são obrigatórias.'}), 400
-        if is_two_character_scene and not all([p2_desc, p2_dialogue]):
-            return jsonify({'error': 'Os campos de descrição e fala para o Personagem 2 são obrigatórios.'}), 400
-
         concept_instruction_text = "You MUST treat the 'Creative Concept' as the absolute core of the character. If the concept is an iconic character (like a superhero), your description MUST include their recognizable costume and attributes faithfully. Your task is to build the details from the 'MANDATORY CHECKLIST' AROUND this core identity, not to replace it."
-        dialogue_instruction_text = ""
-        if slang_text == 'Sim':
-            dialogue_instruction_text = "Rephrase the 'Original Dialogue' with authentic slang and colloquialisms that match the specified 'Accent'."
-        else:
-            dialogue_instruction_text = "Use the 'Original Dialogue' VERBATIM. This is a strict command: you must output the exact, character-for-character string provided without any changes, corrections, or punctuation additions."
+        dialogue_instruction_text = "If 'Use Slang' is 'Sim', rephrase the 'Original Dialogue' with authentic slang and colloquialisms that match the specified 'Accent'. If 'Não', use the 'Original Dialogue' VERBATIM. This is a strict command: you must output the exact, character-for-character string provided without any changes, corrections, or punctuation additions."
 
         instruction = ""
         if is_two_character_scene:
@@ -108,16 +98,18 @@ def generate_prompt():
 
             **4. YOUR TASK (The Recipe):**
             - Create the final prompt in ENGLISH, structured with the labels below.
-            - For the 'Characters' section: You MUST generate two separate, detailed paragraphs, one starting with the literal label '**Character 1:**' and the other with '**Character 2:**'.
+            - In the 'Characters' section, you MUST generate two separate, detailed paragraphs, one starting with the literal label '**Character 1:**' and the other with '**Character 2:**'.
             - For each character block: You MUST create TWO sub-headings: '- Description:' and '- Dialogue:'. Under '- Description:', apply the 'MANDATORY CHARACTER DETAIL CHECKLIST'. Under '- Dialogue:', you MUST apply the 'Dialogue Interpretation Rule' to that character's 'Original Dialogue'.
             - In the 'Scene Breakdown / Action' section, describe the interaction, but DO NOT repeat the dialogue text.
+            - **Atmosphere Rule:** You MUST use the 'Scene Atmosphere' keywords to influence the 'Visuals' (lighting, color) and 'Scene' (mood, feeling) sections. Do not mention the atmosphere keywords directly in the character's description.
+            - **Technical Rule:** For the 'Technical:' section, you MUST list the 'Camera Style Keywords' and 'Date', and then you MUST ALWAYS append the exact phrase: ', no captions, clean video, no music.'
 
             **5. FINAL PROMPT STRUCTURE:**
             **Visuals:** ...
             **Scene:** ...
             **Characters:** ...
             **Scene Breakdown / Action:** ...
-            **Technical:** [For the 'Technical:' section, you MUST list the 'Camera Style Keywords' and 'Date', and then you MUST ALWAYS append the exact phrase: ', no captions, clean video, no music.']
+            **Technical:** ...
             
             **MANDATORY CHARACTER DETAIL CHECKLIST (Apply to EACH character's Description):**
             Invent: Age and Ethnicity, Facial Structure, Eyes, Hair, Skin Details, Physique, Clothing, and Defining Expression.
@@ -139,23 +131,32 @@ def generate_prompt():
             - Create the final prompt structured with the labels below.
             - In the 'Character:' section, create TWO sub-headings: '- Description:' and '- Dialogue:'.
             - For the '- Dialogue:' sub-heading, you MUST apply the 'Dialogue Interpretation Rule' to the 'Original Dialogue'.
+            - **Atmosphere Rule:** You MUST use the 'Atmosphere' keywords to influence the 'Visuals' (lighting, color) and 'Scene' (mood, feeling) sections. Do not mention the atmosphere keywords directly in the character's description.
+            - **Technical Rule:** For the 'Technical:' section, you MUST list the 'Camera Style Keywords' and 'Date', and then you MUST ALWAYS append the exact phrase: ', no captions, clean video, no music.'
 
             **3. FINAL PROMPT STRUCTURE:**
             **Visuals:** ...
             **Scene:** ...
             **Character:** ...
             **Action:** ...
-            **Technical:** [For the 'Technical:' section, you MUST list the 'Camera Style Keywords' and 'Date', and then you MUST ALWAYS append the exact phrase: ', no captions, clean video, no music.']
+            **Technical:** ...
 
             **MANDATORY CHARACTER DETAIL CHECKLIST (Apply to the character's Description):**
             Invent: Age and Ethnicity, Facial Structure, Eyes, Hair, Skin Details, Physique, Clothing, and Defining Expression.
             """
         
+        print("--- PASSO 2: Prompt montado. Enviando para a IA do Gemini... ---")
         model = genai.GenerativeModel('gemini-1.5-flash')
         response = model.generate_content(instruction)
-        return jsonify({'prompt': response.text})
+        print("--- PASSO 3: Resposta da IA recebida! ---")
+        
+        prompt_text = response.text
+        
+        print("--- PASSO 4: Retornando JSON para o frontend. ---")
+        return jsonify({'prompt': prompt_text})
+
     except Exception as e:
-        print(f"Erro detalhado no servidor: {e}")
+        print(f"--- ERRO DETALHADO NO BACKEND: {e} ---")
         return jsonify({'error': 'Ocorreu um erro no servidor ao gerar o prompt.'}), 500
 
 @app.route('/save-character', methods=['POST'])

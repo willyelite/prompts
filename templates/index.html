@@ -27,7 +27,8 @@
         .action-buttons button { color: var(--text-color); border: none; border-radius: 5px; padding: 8px 12px; cursor: pointer; font-weight: 500; transition: background-color 0.2s; }
         .action-buttons button:hover { opacity: 0.8; }
         #copy-button { background: var(--primary-variant); }
-        #save-char-button { background: #006400; }
+        #save-char-button-1 { background: #006400; }
+        #save-char-button-2 { background: #005a9c; }
         #favorite-button { background: #444; }
         #favorite-button.favorited { background: #b33737; }
         .loader { display: none; text-align: center; padding: 2rem; }
@@ -61,11 +62,11 @@
             <h2>Personagem 1</h2>
             <div class="form-group full-width">
                 <label for="character1"><span>Descrição do Personagem 1</span></label>
-                <textarea id="character1" placeholder="Digite uma ideia (ex: 'Homem de 40 anos, cansado') ou carregue um personagem salvo acima."></textarea>
+                <textarea id="character1" placeholder="Digite uma ideia ou carregue um personagem salvo acima."></textarea>
             </div>
             <div class="form-group full-width">
                 <label for="dialogue1"><span>Fala do Personagem 1</span></label>
-                <textarea id="dialogue1" placeholder="Ex: Eu não aguento mais um dia neste escritório."></textarea>
+                <textarea id="dialogue1" placeholder="Ex: Eu não aguento mais."></textarea>
                 <div style="margin-top: 1rem;">
                     <label class="sub-label">Idioma da Fala 1</label>
                     <div class="radio-options">
@@ -80,11 +81,11 @@
                 <h2>Personagem 2</h2>
                 <div class="form-group full-width">
                     <label for="character2"><span>Descrição do Personagem 2</span></label>
-                    <textarea id="character2" placeholder="Ex: Mulher jovem, estagiária, otimista..."></textarea>
+                    <textarea id="character2" placeholder="Digite uma ideia ou carregue um personagem salvo."></textarea>
                 </div>
                 <div class="form-group full-width">
                     <label for="dialogue2"><span>Fala do Personagem 2</span></label>
-                    <textarea id="dialogue2" placeholder="Ex: Mas hoje é sexta-feira, chefe!"></textarea>
+                    <textarea id="dialogue2" placeholder="Ex: Calma, tudo vai melhorar."></textarea>
                     <div style="margin-top: 1rem;">
                         <label class="sub-label">Idioma da Fala 2</label>
                         <div class="radio-options">
@@ -106,6 +107,10 @@
             <div class="form-group">
                 <label for="slang"><span>Usar Gírias? (Geral)</span></label>
                 <select id="slang"><option value="Não">Não</option><option value="Sim">Sim</option></select>
+            </div>
+            <div class="form-group">
+                <label for="interpretation_style"><span>Estilo de Interpretação</span></label>
+                <select id="interpretation_style"><option value="Inspirado">Inspirado / Sutil</option><option value="Literal">Literal / Fiel ao Conceito</option></select>
             </div>
             <div class="form-group">
                 <label for="location"><span>Local da Cena</span></label>
@@ -135,7 +140,8 @@
         <div class="result-wrapper" id="result-wrapper">
             <h2>Prompt Gerado</h2>
             <div class="action-buttons">
-                <button id="save-char-button" title="Salvar a descrição deste personagem" onclick="saveGeneratedCharacter()">Salvar Personagem</button>
+                <button id="save-char-button-1" title="Salvar a descrição do Personagem 1" onclick="saveGeneratedCharacter(1)" style="display: none;">Salvar P1</button>
+                <button id="save-char-button-2" title="Salvar a descrição do Personagem 2" onclick="saveGeneratedCharacter(2)" style="display: none;">Salvar P2</button>
                 <button id="favorite-button" title="Salvar este prompt nos seus favoritos">☆ Favoritar</button>
                 <button id="copy-button" onclick="copiar()">Copiar</button>
             </div>
@@ -154,65 +160,50 @@
     </div>
 
     <script>
-        // --- FUNÇÃO saveGeneratedCharacter COM LÓGICA DUPLA E CORRIGIDA ---
-        async function saveGeneratedCharacter() {
+        const MAX_HISTORY_ITEMS = 5;
+
+        // --- LÓGICA DE GERENCIAMENTO DE PERSONAGEM ---
+        async function saveGeneratedCharacter(charNumber = 1) {
             const fullPromptText = document.getElementById('resultado').innerText;
             if (!fullPromptText || fullPromptText.startsWith('Erro:')) return alert('Não há um prompt válido para salvar.');
             
-            let characterDescription = '';
-            
-            // Regex 1: Tenta o formato mais estruturado (ex: "Character 1: ... - Description: ...")
-            // Procura por "Character 1", ignora tudo até "- Description:", captura o texto, e para antes de "- Dialogue:" ou "Character 2:"
-            const regex1 = /Character 1:[\s\S]*?-\s*(?:\*\*)?Description(?:\*\*)?:([\s\S]*?)(?=-\s*(?:\*\*)?Dialogue(?:\*\*)|(?:\*\*)?Character 2(?:\*\*)|Action:|$)/i;
-            let match = fullPromptText.match(regex1);
+            const regex = new RegExp(`Character ${charNumber}:[\\s\\S]*?-\\s*Description:([\\s\\S]*?)(?=-\\s*Dialogue:|Character \\d:|Action:|$)`, 'i');
+            const match = fullPromptText.match(regex);
 
-            if (match && match[1]) {
-                characterDescription = match[1].trim();
-            } else {
-                // Se a primeira falhar, tenta a Regex 2 (para o formato mais simples "Character: ...")
-                console.log("DEBUG: Regex para 'Character 1' falhou. Tentando regex para 'Character:'.");
-                const regex2 = /Character:([\s\S]*?)(?=\n\nAction:|$)/i;
-                match = fullPromptText.match(regex2);
-                
-                if (match && match[1]) {
-                    // Pega o bloco inteiro do personagem
-                    let fullBlock = match[1];
-                    // Tenta remover a parte do diálogo se ela existir no bloco
-                    const dialogueIndex = fullBlock.search(/-\s*(?:\*\*)?Dialogue/i);
-                    if (dialogueIndex !== -1) {
-                        fullBlock = fullBlock.substring(0, dialogueIndex);
+            if (!match || !match[1]) {
+                if (charNumber === 1) {
+                    const genericRegex = /(?:\*\*)?Character(?:\*\*)?:([\s\S]*?)(?=\n\s*\*\*?Action:\*\*?|$)/i;
+                    const genericMatch = fullPromptText.match(genericRegex);
+                    if (genericMatch && genericMatch[1]) {
+                        let block = genericMatch[1];
+                        const dialogueIndex = block.search(/-\s*(?:\*\*)?Dialogue/i);
+                        if (dialogueIndex !== -1) { block = block.substring(0, dialogueIndex); }
+                        const description = block.replace(/-\s*(?:\*\*)?Description(?:\*\*)?:/i, '').trim();
+                        promptAndSave(description, 1);
+                        return;
                     }
-                    // Remove a label "- Description:" se ela existir
-                    characterDescription = fullBlock.replace(/-\s*(?:\*\*)?Description(?:\*\*)?:/i, '').trim();
                 }
-            }
-
-            if (!characterDescription) {
-                alert('Não foi possível extrair a descrição do Personagem do prompt gerado.');
-                console.error("DEBUG: Ambas as Regex falharam. Texto completo:", fullPromptText);
+                alert(`Não foi possível extrair a descrição do Personagem ${charNumber}.`);
+                console.error(`DEBUG: Falha na extração para P${charNumber}. Texto:`, fullPromptText);
                 return;
             }
-            
-            const name = prompt('Digite um nome para salvar este personagem:', 'Personagem - ' + new Date().toLocaleTimeString());
+            const characterDescription = match[1].trim();
+            promptAndSave(characterDescription, charNumber);
+        }
+
+        async function promptAndSave(description, charNumber) {
+            const name = prompt(`Digite um nome para salvar o Personagem ${charNumber}:`, `Personagem ${charNumber} - ` + new Date().toLocaleTimeString());
             if (!name) return alert('Salvamento cancelado.');
-            
-            const payload = { name: name, description: characterDescription };
+            const payload = { name: name, description: description };
             try {
-                const response = await fetch('/save-character', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                const response = await fetch('/save-character', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 const result = await response.json();
                 alert(result.message || `Erro: ${result.error}`);
                 if (result.success) loadCharacterList();
             } catch (error) {
-                alert('Ocorreu um erro de comunicação ao tentar salvar o personagem.');
+                alert('Ocorreu um erro de comunicação ao tentar salvar.');
             }
         }
-        
-        // --- TODAS AS OUTRAS FUNÇÕES COMPLETAS ---
-        const MAX_HISTORY_ITEMS = 5;
 
         async function loadCharacterList() {
             try {
@@ -234,14 +225,17 @@
             const select = document.getElementById('saved-characters-list');
             const characterName = select.value;
             if (!characterName) return alert('Por favor, selecione um personagem da lista.');
+            const isChar2Active = document.getElementById('add-character-2-checkbox').checked;
+            const targetTextareaId = isChar2Active ? 'character2' : 'character1';
+            const targetCharNumber = isChar2Active ? 2 : 1;
             try {
                 const response = await fetch(`/character/${encodeURIComponent(characterName)}`);
                 const data = await response.json();
                 if (data.error) {
                     alert(`Erro: ${data.error}`);
                 } else {
-                    document.getElementById('character1').value = data.description;
-                    alert(`Personagem "${data.name}" carregado com sucesso.`);
+                    document.getElementById(targetTextareaId).value = data.description;
+                    alert(`Personagem "${data.name}" carregado com sucesso no campo 'Descrição do Personagem ${targetCharNumber}'.`);
                 }
             } catch (error) { alert('Ocorreu um erro de comunicação ao carregar o personagem.'); }
         }
@@ -259,6 +253,7 @@
             } catch (error) { alert('Ocorreu um erro de comunicação ao tentar apagar.'); }
         }
 
+        // --- LÓGICA DO HISTÓRICO ---
         function saveToHistory(promptText) {
             let history = JSON.parse(localStorage.getItem('promptHistory')) || [];
             history.unshift(promptText);
@@ -287,6 +282,7 @@
             }
         }
 
+        // --- LÓGICA DOS FAVORITOS ---
         function toggleFavorite() {
             const promptText = document.getElementById('resultado').innerText;
             if (!promptText || promptText.startsWith('Erro:')) return;
@@ -330,8 +326,10 @@
                 favButton.textContent = '☆ Favoritar';
                 favButton.classList.remove('favorited');
             }
+            favButton.onclick = toggleFavorite; // Atribui o evento de clique aqui
         }
         
+        // --- FUNÇÕES GERAIS DA PÁGINA ---
         function handleCharacterCountChange() {
             const char2Fields = document.getElementById('character-2-fields');
             const checkbox = document.getElementById('add-character-2-checkbox');
@@ -361,20 +359,17 @@
             const generateButton = document.getElementById('generate-button');
             const loader = document.getElementById('loader');
             const resultWrapper = document.getElementById('result-wrapper');
+            const saveBtn1 = document.getElementById('save-char-button-1');
+            const saveBtn2 = document.getElementById('save-char-button-2');
             generateButton.disabled = true;
             generateButton.innerText = 'Gerando...';
             loader.style.display = 'block';
             resultWrapper.style.display = 'none';
+            saveBtn1.style.display = 'none'; 
+            saveBtn2.style.display = 'none';
+            
             const isChar2Active = document.getElementById('add-character-2-checkbox').checked;
-            function getLanguageValue(num) {
-                const langRadio = document.querySelector(`input[name="language${num}"]:checked`);
-                if (!langRadio) return 'Português'; 
-                let languageValue = langRadio.value;
-                if (languageValue === 'other') {
-                    languageValue = document.getElementById(`other-language-input-${num}`).value || 'Idioma não especificado';
-                }
-                return languageValue;
-            }
+            function getLanguageValue(num) { const langRadio = document.querySelector(`input[name="language${num}"]:checked`); if (!langRadio) return 'Português'; let languageValue = langRadio.value; if (languageValue === 'other') { languageValue = document.getElementById(`other-language-input-${num}`).value || 'Idioma não especificado'; } return languageValue; }
             const payload = {
                 location: document.getElementById('location').value,
                 date: document.getElementById('date').value,
@@ -383,6 +378,7 @@
                 atmosphere: document.getElementById('atmosphere').value,
                 accent: document.getElementById('accent').value,
                 slang: document.getElementById('slang').value,
+                interpretation_style: document.getElementById('interpretation_style').value,
                 character_count: isChar2Active ? '2' : '1',
                 character1_desc: document.getElementById('character1').value,
                 dialogue1: document.getElementById('dialogue1').value,
@@ -405,6 +401,14 @@
                     document.getElementById('resultado').innerText = `Erro: ${data.error}`;
                 } else {
                     document.getElementById('resultado').innerText = data.prompt;
+                    if (data.prompt) {
+                        if (data.prompt.toLowerCase().includes("character")) {
+                            saveBtn1.style.display = 'inline-block';
+                        }
+                        if (data.prompt.toLowerCase().includes("character 2:")) {
+                            saveBtn2.style.display = 'inline-block';
+                        }
+                    }
                     saveToHistory(data.prompt);
                     updateFavoriteButtonState();
                 }
