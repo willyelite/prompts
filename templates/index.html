@@ -13,10 +13,10 @@
         h2 { margin-top: 0; color: var(--primary-color); opacity: 0.9; }
         .form-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-top: 1rem; }
         @media (min-width: 768px) { .form-grid { grid-template-columns: 1fr 1fr; } }
-        .form-group, .form-group-radio { display: flex; flex-direction: column; }
-        .radio-options { display: flex; align-items: center; gap: 1.5rem; margin-top: 0.5rem; }
+        .form-group { display: flex; flex-direction: column; gap: 1rem; }
         .full-width { grid-column: 1 / -1; }
-        label { margin-bottom: 0.5rem; font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
+        label { margin-bottom: -0.5rem; font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
+        .sub-label { font-size: 0.9rem; font-weight: 400; }
         input, select, textarea { background-color: var(--surface-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-size: 1rem; width: 100%; box-sizing: border-box; transition: border-color 0.2s; }
         input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary-color); border-color: var(--primary-color); }
         textarea { resize: vertical; height: 80px; }
@@ -28,6 +28,7 @@
         .action-buttons button:hover { opacity: 0.8; }
         #copy-button { background: var(--primary-variant); }
         #save-char-button { background: #006400; }
+        #favorite-button { background: #444; }
         #favorite-button.favorited { background: #b33737; }
         .loader { display: none; text-align: center; padding: 2rem; }
         .history-wrapper { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
@@ -37,6 +38,7 @@
         .load-character-section { display: flex; align-items: center; gap: 1rem; flex-grow: 1; }
         .checkbox-section label { font-size: 1.1rem; cursor: pointer; }
         .checkbox-section input[type="checkbox"] { width: 1.2rem; height: 1.2rem; margin-right: 0.75rem; }
+        .radio-options { display: flex; align-items: center; gap: 1.5rem; }
     </style>
 </head>
 <body>
@@ -64,13 +66,13 @@
             <div class="form-group full-width">
                 <label for="dialogue1"><span>Fala do Personagem 1</span></label>
                 <textarea id="dialogue1" placeholder="Ex: Eu não aguento mais um dia neste escritório."></textarea>
-            </div>
-            <div class="form-group-radio full-width" style="margin-top: -1rem; margin-bottom: 1rem;">
-                <label>Idioma da Fala 1</label>
-                <div class="radio-options">
-                    <label><input type="radio" name="language1" value="Português" checked onchange="handleLanguageChange(1)"> Português</label>
-                    <label><input type="radio" name="language1" value="other" onchange="handleLanguageChange(1)"> Outro:</label>
-                    <input type="text" id="other-language-input-1" placeholder="Digite o idioma" disabled>
+                <div style="margin-top: 1rem;">
+                    <label class="sub-label">Idioma da Fala 1</label>
+                    <div class="radio-options">
+                        <label><input type="radio" name="language1" value="Português" checked onchange="handleLanguageChange(1)"> Português</label>
+                        <label><input type="radio" name="language1" value="other" onchange="handleLanguageChange(1)"> Outro:</label>
+                        <input type="text" id="other-language-input-1" placeholder="Digite o idioma" disabled>
+                    </div>
                 </div>
             </div>
             
@@ -83,13 +85,13 @@
                 <div class="form-group full-width">
                     <label for="dialogue2"><span>Fala do Personagem 2</span></label>
                     <textarea id="dialogue2" placeholder="Ex: Mas hoje é sexta-feira, chefe!"></textarea>
-                </div>
-                <div class="form-group-radio full-width" style="margin-top: -1rem; margin-bottom: 1rem;">
-                    <label>Idioma da Fala 2</label>
-                    <div class="radio-options">
-                        <label><input type="radio" name="language2" value="Português" checked onchange="handleLanguageChange(2)"> Português</label>
-                        <label><input type="radio" name="language2" value="other" onchange="handleLanguageChange(2)"> Outro:</label>
-                        <input type="text" id="other-language-input-2" placeholder="Digite o idioma" disabled>
+                    <div style="margin-top: 1rem;">
+                        <label class="sub-label">Idioma da Fala 2</label>
+                        <div class="radio-options">
+                            <label><input type="radio" name="language2" value="Português" checked onchange="handleLanguageChange(2)"> Português</label>
+                            <label><input type="radio" name="language2" value="other" onchange="handleLanguageChange(2)"> Outro:</label>
+                            <input type="text" id="other-language-input-2" placeholder="Digite o idioma" disabled>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -99,15 +101,7 @@
             <h2 class="full-width">Detalhes da Cena</h2>
             <div class="form-group">
                 <label for="accent"><span>Sotaque (Geral)</span></label>
-                <select id="accent">
-                    <option value="Carioca">Carioca</option>
-                    <option value="Paulista">Paulista</option>
-                    <option value="Mineiro">Mineiro</option>
-                    <option value="Baiano">Baiano</option>
-                    <option value="Nordestino (Geral)">Nordestino (Geral)</option>
-                    <option value="Sulista (Geral)">Sulista (Geral)</option>
-                    <option value="Neutro Brasileiro">Neutro Brasileiro</option>
-                </select>
+                <select id="accent"><option value="Carioca">Carioca</option><option value="Paulista">Paulista</option><option value="Mineiro">Mineiro</option><option value="Baiano">Baiano</option><option value="Nordestino (Geral)">Nordestino (Geral)</option><option value="Sulista (Geral)">Sulista (Geral)</option><option value="Neutro Brasileiro">Neutro Brasileiro</option></select>
             </div>
             <div class="form-group">
                 <label for="slang"><span>Usar Gírias? (Geral)</span></label>
@@ -160,13 +154,190 @@
     </div>
 
     <script>
-        // --- FUNÇÕES DE LÓGICA DO FORMULÁRIO ---
+        // --- FUNÇÃO saveGeneratedCharacter COM LÓGICA DUPLA E CORRIGIDA ---
+        async function saveGeneratedCharacter() {
+            const fullPromptText = document.getElementById('resultado').innerText;
+            if (!fullPromptText || fullPromptText.startsWith('Erro:')) return alert('Não há um prompt válido para salvar.');
+            
+            let characterDescription = '';
+            
+            // Regex 1: Tenta o formato mais estruturado (ex: "Character 1: ... - Description: ...")
+            // Procura por "Character 1", ignora tudo até "- Description:", captura o texto, e para antes de "- Dialogue:" ou "Character 2:"
+            const regex1 = /Character 1:[\s\S]*?-\s*(?:\*\*)?Description(?:\*\*)?:([\s\S]*?)(?=-\s*(?:\*\*)?Dialogue(?:\*\*)|(?:\*\*)?Character 2(?:\*\*)|Action:|$)/i;
+            let match = fullPromptText.match(regex1);
+
+            if (match && match[1]) {
+                characterDescription = match[1].trim();
+            } else {
+                // Se a primeira falhar, tenta a Regex 2 (para o formato mais simples "Character: ...")
+                console.log("DEBUG: Regex para 'Character 1' falhou. Tentando regex para 'Character:'.");
+                const regex2 = /Character:([\s\S]*?)(?=\n\nAction:|$)/i;
+                match = fullPromptText.match(regex2);
+                
+                if (match && match[1]) {
+                    // Pega o bloco inteiro do personagem
+                    let fullBlock = match[1];
+                    // Tenta remover a parte do diálogo se ela existir no bloco
+                    const dialogueIndex = fullBlock.search(/-\s*(?:\*\*)?Dialogue/i);
+                    if (dialogueIndex !== -1) {
+                        fullBlock = fullBlock.substring(0, dialogueIndex);
+                    }
+                    // Remove a label "- Description:" se ela existir
+                    characterDescription = fullBlock.replace(/-\s*(?:\*\*)?Description(?:\*\*)?:/i, '').trim();
+                }
+            }
+
+            if (!characterDescription) {
+                alert('Não foi possível extrair a descrição do Personagem do prompt gerado.');
+                console.error("DEBUG: Ambas as Regex falharam. Texto completo:", fullPromptText);
+                return;
+            }
+            
+            const name = prompt('Digite um nome para salvar este personagem:', 'Personagem - ' + new Date().toLocaleTimeString());
+            if (!name) return alert('Salvamento cancelado.');
+            
+            const payload = { name: name, description: characterDescription };
+            try {
+                const response = await fetch('/save-character', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                alert(result.message || `Erro: ${result.error}`);
+                if (result.success) loadCharacterList();
+            } catch (error) {
+                alert('Ocorreu um erro de comunicação ao tentar salvar o personagem.');
+            }
+        }
+        
+        // --- TODAS AS OUTRAS FUNÇÕES COMPLETAS ---
+        const MAX_HISTORY_ITEMS = 5;
+
+        async function loadCharacterList() {
+            try {
+                const response = await fetch('/characters');
+                if (!response.ok) return;
+                const names = await response.json();
+                const select = document.getElementById('saved-characters-list');
+                select.innerHTML = '<option value="">Carregar personagem salvo...</option>';
+                names.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    select.appendChild(option);
+                });
+            } catch (error) { console.error("Erro ao carregar lista de personagens:", error); }
+        }
+
+        async function handleCharacterLoad() {
+            const select = document.getElementById('saved-characters-list');
+            const characterName = select.value;
+            if (!characterName) return alert('Por favor, selecione um personagem da lista.');
+            try {
+                const response = await fetch(`/character/${encodeURIComponent(characterName)}`);
+                const data = await response.json();
+                if (data.error) {
+                    alert(`Erro: ${data.error}`);
+                } else {
+                    document.getElementById('character1').value = data.description;
+                    alert(`Personagem "${data.name}" carregado com sucesso.`);
+                }
+            } catch (error) { alert('Ocorreu um erro de comunicação ao carregar o personagem.'); }
+        }
+        
+        async function handleCharacterDelete() {
+            const select = document.getElementById('saved-characters-list');
+            const characterName = select.value;
+            if (!characterName) return alert('Por favor, selecione um personagem da lista para apagar.');
+            if (!confirm(`Você tem certeza que quer apagar "${characterName}"?`)) return;
+            try {
+                const response = await fetch(`/character/${encodeURIComponent(characterName)}`, { method: 'DELETE' });
+                const data = await response.json();
+                alert(data.message || `Erro: ${data.error}`);
+                if (data.success) loadCharacterList();
+            } catch (error) { alert('Ocorreu um erro de comunicação ao tentar apagar.'); }
+        }
+
+        function saveToHistory(promptText) {
+            let history = JSON.parse(localStorage.getItem('promptHistory')) || [];
+            history.unshift(promptText);
+            history = history.slice(0, MAX_HISTORY_ITEMS);
+            localStorage.setItem('promptHistory', JSON.stringify(history));
+            loadHistory();
+        }
+
+        function loadHistory() {
+            const historyListDiv = document.getElementById('history-list');
+            const historyWrapper = document.getElementById('history-wrapper');
+            let history = JSON.parse(localStorage.getItem('promptHistory')) || [];
+            if (history.length > 0) {
+                historyWrapper.style.display = 'block';
+                historyListDiv.innerHTML = '';
+                history.forEach(promptText => {
+                    const item = document.createElement('div');
+                    item.className = 'history-item';
+                    item.innerText = promptText.substring(0, 100) + '...';
+                    item.title = "Clique para copiar este prompt";
+                    item.onclick = () => navigator.clipboard.writeText(promptText).then(() => alert('Prompt do histórico copiado!'));
+                    historyListDiv.appendChild(item);
+                });
+            } else {
+                historyWrapper.style.display = 'none';
+            }
+        }
+
+        function toggleFavorite() {
+            const promptText = document.getElementById('resultado').innerText;
+            if (!promptText || promptText.startsWith('Erro:')) return;
+            let favorites = JSON.parse(localStorage.getItem('promptFavorites')) || [];
+            const index = favorites.indexOf(promptText);
+            if (index > -1) { favorites.splice(index, 1); } else { favorites.unshift(promptText); }
+            localStorage.setItem('promptFavorites', JSON.stringify(favorites));
+            loadFavorites();
+            updateFavoriteButtonState();
+        }
+
+        function loadFavorites() {
+            const favoritesListDiv = document.getElementById('favorites-list');
+            const favoritesWrapper = document.getElementById('favorites-wrapper');
+            let favorites = JSON.parse(localStorage.getItem('promptFavorites')) || [];
+            if (favorites.length > 0) {
+                favoritesWrapper.style.display = 'block';
+                favoritesListDiv.innerHTML = '';
+                favorites.forEach(promptText => {
+                    const item = document.createElement('div');
+                    item.className = 'history-item';
+                    item.innerText = promptText.substring(0, 100) + '...';
+                    item.title = "Clique para copiar este prompt favorito";
+                    item.onclick = () => navigator.clipboard.writeText(promptText).then(() => alert('Prompt favorito copiado!'));
+                    favoritesListDiv.appendChild(item);
+                });
+            } else {
+                favoritesWrapper.style.display = 'none';
+            }
+        }
+
+        function updateFavoriteButtonState() {
+            const promptText = document.getElementById('resultado').innerText;
+            const favButton = document.getElementById('favorite-button');
+            if (!favButton || !promptText || promptText.startsWith('Erro:')) return;
+            let favorites = JSON.parse(localStorage.getItem('promptFavorites')) || [];
+            if (favorites.includes(promptText)) {
+                favButton.textContent = '★ Favorito';
+                favButton.classList.add('favorited');
+            } else {
+                favButton.textContent = '☆ Favoritar';
+                favButton.classList.remove('favorited');
+            }
+        }
+        
         function handleCharacterCountChange() {
             const char2Fields = document.getElementById('character-2-fields');
             const checkbox = document.getElementById('add-character-2-checkbox');
             char2Fields.style.display = checkbox.checked ? 'block' : 'none';
         }
-
+        
         function handleLanguageChange(charNumber) {
             const otherRadio = document.querySelector(`input[name="language${charNumber}"][value="other"]`);
             const otherInput = document.getElementById(`other-language-input-${charNumber}`);
@@ -180,18 +351,12 @@
             const month = now.toLocaleString('pt-BR', { month: 'long' });
             const year = now.getFullYear();
             dateInput.value = `${month.charAt(0).toUpperCase() + month.slice(1)} de ${year}`;
-            
-            // Carrega todas as listas
             loadHistory();
             loadFavorites();
             loadCharacterList();
-
-            // Garante o estado inicial correto dos campos de idioma
-            handleLanguageChange(1);
-            handleLanguageChange(2);
+            handleCharacterCountChange();
         });
 
-        // --- FUNÇÃO PRINCIPAL PARA GERAR PROMPT ---
         async function gerar() {
             const generateButton = document.getElementById('generate-button');
             const loader = document.getElementById('loader');
@@ -200,41 +365,34 @@
             generateButton.innerText = 'Gerando...';
             loader.style.display = 'block';
             resultWrapper.style.display = 'none';
-            
+            const isChar2Active = document.getElementById('add-character-2-checkbox').checked;
             function getLanguageValue(num) {
                 const langRadio = document.querySelector(`input[name="language${num}"]:checked`);
-                if (!langRadio) return 'Português'; // Padrão de segurança
+                if (!langRadio) return 'Português'; 
                 let languageValue = langRadio.value;
                 if (languageValue === 'other') {
                     languageValue = document.getElementById(`other-language-input-${num}`).value || 'Idioma não especificado';
                 }
                 return languageValue;
             }
-
-            const isChar2Active = document.getElementById('add-character-2-checkbox').checked;
             const payload = {
-                // Gerais
                 location: document.getElementById('location').value,
                 date: document.getElementById('date').value,
                 camera_style: document.getElementById('camera_style').value,
                 visual_style: document.getElementById('visual_style').value,
                 atmosphere: document.getElementById('atmosphere').value,
-                accent: document.getElementById('accent').value, // Sotaque geral
-                slang: document.getElementById('slang').value,   // Gíria geral
-                
-                // Personagem 1
+                accent: document.getElementById('accent').value,
+                slang: document.getElementById('slang').value,
                 character_count: isChar2Active ? '2' : '1',
                 character1_desc: document.getElementById('character1').value,
                 dialogue1: document.getElementById('dialogue1').value,
                 language1: getLanguageValue(1),
             };
-
             if (isChar2Active) {
                 payload.character2_desc = document.getElementById('character2').value;
                 payload.dialogue2 = document.getElementById('dialogue2').value;
                 payload.language2 = getLanguageValue(2);
             }
-
             try {
                 const response = await fetch('/generate-prompt', {
                     method: 'POST',
@@ -260,9 +418,17 @@
             }
         }
         
-        // --- TODAS AS OUTRAS FUNÇÕES AUXILIARES ---
-        // As funções de copiar, salvar personagem, carregar personagem, apagar, favoritos e histórico continuam aqui.
-        // O código delas não precisa mudar.
+        function copiar() {
+            const textoParaCopiar = document.getElementById('resultado').innerText;
+            const copyButton = document.getElementById('copy-button');
+            navigator.clipboard.writeText(textoParaCopiar).then(() => {
+                copyButton.innerText = 'Copiado!';
+                setTimeout(() => { copyButton.innerText = 'Copiar'; }, 2000);
+            }, () => {
+                copyButton.innerText = 'Erro!';
+                 setTimeout(() => { copyButton.innerText = 'Copiar'; }, 2000);
+            });
+        }
     </script>
 </body>
 </html>
