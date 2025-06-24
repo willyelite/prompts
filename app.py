@@ -1,10 +1,10 @@
 import os
 import google.generativeai as genai
 from flask import Flask, render_template, request, jsonify
-from markupsafe import escape
 from dotenv import load_dotenv
 from flask_sqlalchemy import SQLAlchemy
 
+# --- CONFIGURAÇÃO INICIAL ---
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
@@ -13,7 +13,7 @@ genai.configure(api_key=api_key)
 
 app = Flask(__name__)
 
-# --- CONFIGURAÇÃO DO POSTGRESQL ---
+# --- CONFIGURAÇÃO DO BANCO DE DADOS POSTGRESQL ---
 db_url = os.getenv('DATABASE_URL')
 if not db_url:
     raise ValueError("A variável de ambiente DATABASE_URL não foi encontrada.")
@@ -30,13 +30,23 @@ class Counter(db.Model):
 
 class SavedCharacter(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
+    name = db.Column(db.String(100), nullable=False, unique=True)
     description = db.Column(db.Text, nullable=False)
 
 with app.app_context():
     db.create_all()
 
-# --- ROTAS DA APLICAÇÃO ---
+# --- FUNÇÃO HELPER PARA CHAMAR A IA ---
+def generate_ia_content(instruction):
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    try:
+        response = model.generate_content(instruction)
+        return response.text
+    except Exception as e:
+        print(f"Erro na chamada da API Gemini: {e}")
+        return f"Erro na IA: {e}"
+
+# --- ROTAS PRINCIPAIS ---
 @app.route('/')
 def index():
     hit_counter = db.session.get(Counter, 1)
@@ -50,171 +60,122 @@ def index():
 
 @app.route('/generate-prompt', methods=['POST'])
 def generate_prompt():
-    print("\n--- PASSO 1: Rota /generate-prompt recebida com sucesso. ---")
     try:
         data = request.json
         
-        def process_language(lang):
-            return 'Brazilian Portuguese' if lang == 'Português' else lang
-
-        # Coleta de dados
-        p1_desc = data.get('character1_desc')
-        p1_dialogue = data.get('dialogue1')
-        p1_language = process_language(data.get('language1'))
-        
-        p2_desc = data.get('character2_desc')
-        p2_dialogue = data.get('dialogue2')
-        p2_language = process_language(data.get('language2'))
-        
+        # Coleta de dados do payload
+        character_concept_pt = data.get('character1')
+        dialogue_text_pt = data.get('dialogue1')
         location_concept_pt = data.get('location')
-        date_text = data.get('date')
-        camera_style_text = data.get('camera_style')
-        visual_style_text = data.get('visual_style')
-        atmosphere_text = data.get('atmosphere')
+        scene_action_text = data.get('scene_action')
+        use_slang_text = data.get('slang')
         accent_text = data.get('accent')
-        slang_text = data.get('slang')
+        language_text = data.get('language')
+        character_count = data.get('character_count', '1')
         
-        is_two_character_scene = bool(p2_desc and p2_dialogue)
-        concept_instruction_text = "You MUST treat the 'Creative Concept' as the absolute core of the character. If the concept is an iconic character (like a superhero), your description MUST include their recognizable costume and attributes faithfully. Your task is to build the details from the 'MANDATORY CHECKLIST' AROUND this core identity, not to replace it."
-        dialogue_instruction_text = "If 'Use Slang' is 'Sim', rephrase the 'Original Dialogue' with authentic slang and colloquialisms that match the specified 'Accent'. If 'Não', use the 'Original Dialogue' VERBATIM. This is a strict command: you must output the exact, character-for-character string provided without any changes, corrections, or punctuation additions."
+        # --- PIPELINE DE GERAÇÃO ATÔMICA ---
+        desc_instruction_1 = f"Generate a hyper-detailed character description in ENGLISH based on this concept: '{character_concept_pt}'. You MUST include details for: Age and Ethnicity, Facial Structure, Eyes, Hair, Skin Details, Physique, Clothing, and Defining Expression."
+        desc_text_1 = generate_ia_content(desc_instruction_1)
 
-        instruction = ""
-        if is_two_character_scene:
-            instruction = f"""
-            You are a creative prompt engineer for AI video generators, creating a dynamic two-character dialogue scene.
-            **1. CORE CONCEPTS & RULES:**
-            - General Style: "{visual_style_text}", "{camera_style_text}", Date: "{date_text}"
-            - Scene: Location Idea: "{location_concept_pt}", Atmosphere: "{atmosphere_text}"
-            - Character Interpretation Rule: {concept_instruction_text}
-            - Dialogue Interpretation Rule: {dialogue_instruction_text}
-            
-            **2. CHARACTER 1 DATA:**
-            - Creative Concept: "{p1_desc}"
-            - Original Dialogue: "{p1_dialogue}" spoken in {p1_language} with a '{accent_text}' accent.
+        action_instruction_1 = f"The overall scene context is '{scene_action_text}'. Based on the character '{desc_text_1}' and their dialogue '{dialogue_text_pt}', describe in ENGLISH their specific physical action just before or while they speak."
+        action_text_1 = generate_ia_content(action_instruction_1)
 
-            **3. CHARACTER 2 DATA:**
-            - Creative Concept: "{p2_desc}"
-            - Original Dialogue: "{p2_dialogue}" spoken in {p2_language} with a '{accent_text}' accent.
-
-            **4. YOUR TASK (The Recipe):**
-            - Create the final prompt in ENGLISH, structured with the labels below.
-            - In the 'Characters' section, you MUST generate two separate, detailed paragraphs, one starting with the literal label '**Character 1:**' and the other with '**Character 2:**'.
-            - For each character block: You MUST create TWO sub-headings: '- Description:' and '- Dialogue:'. Under '- Description:', apply the 'MANDATORY CHARACTER DETAIL CHECKLIST'. Under '- Dialogue:', you MUST apply the 'Dialogue Interpretation Rule' to that character's 'Original Dialogue'.
-            - In the 'Scene Breakdown / Action' section, describe the interaction, but DO NOT repeat the dialogue text.
-            - **Atmosphere Rule:** You MUST use the 'Scene Atmosphere' keywords to influence the 'Visuals' (lighting, color) and 'Scene' (mood, feeling) sections. Do not mention the atmosphere keywords directly in the character's description.
-            - **Technical Rule:** For the 'Technical:' section, you MUST list the 'Camera Style Keywords' and 'Date', and then you MUST ALWAYS append the exact phrase: ', no captions, clean video, no music.'
-
-            **5. FINAL PROMPT STRUCTURE:**
-            **Visuals:** ...
-            **Scene:** ...
-            **Characters:** ...
-            **Scene Breakdown / Action:** ...
-            **Technical:** ...
-            
-            **MANDATORY CHARACTER DETAIL CHECKLIST (Apply to EACH character's Description):**
-            Invent: Age and Ethnicity, Facial Structure, Eyes, Hair, Skin Details, Physique, Clothing, and Defining Expression.
-            """
+        if use_slang_text == 'Sim':
+            slang_instruction_1 = f"Rephrase the following portuguese dialogue to include authentic slang for a '{accent_text}' accent, keeping the core meaning: '{dialogue_text_pt}'"
+            dialogue_text_1 = generate_ia_content(slang_instruction_1)
         else:
-            instruction = f"""
-            You are a creative prompt engineer for AI video generators.
-            Your mission is to use the user's high-level concept to generate a HYPER-DETAILED prompt in ENGLISH.
+            dialogue_text_1 = dialogue_text_pt
 
-            **1. CORE CONCEPTS & RULES:**
-            - Character's Creative Concept: "{p1_desc}"
-            - Original Dialogue: "{p1_dialogue}" spoken in {p1_language} with a '{accent_text}' accent.
-            - Scene: Location: "{location_concept_pt}", Atmosphere: "{atmosphere_text}"
-            - General Style: "{visual_style_text}", "{camera_style_text}", Date: "{date_text}"
-            - Character Interpretation Rule: {concept_instruction_text}
-            - Dialogue Interpretation Rule: {dialogue_instruction_text}
+        desc_text_2, action_text_2, dialogue_text_2 = "", "", ""
+        if character_count == '2':
+            character2_concept_pt = data.get('character2')
+            dialogue2_text_pt = data.get('dialogue2')
             
-            **2. YOUR TASK (The Recipe):**
-            - Create the final prompt structured with the labels below.
-            - In the 'Character:' section, create TWO sub-headings: '- Description:' and '- Dialogue:'.
-            - For the '- Dialogue:' sub-heading, you MUST apply the 'Dialogue Interpretation Rule' to the 'Original Dialogue'.
-            - **Atmosphere Rule:** You MUST use the 'Atmosphere' keywords to influence the 'Visuals' (lighting, color) and 'Scene' (mood, feeling) sections. Do not mention the atmosphere keywords directly in the character's description.
-            - **Technical Rule:** For the 'Technical:' section, you MUST list the 'Camera Style Keywords' and 'Date', and then you MUST ALWAYS append the exact phrase: ', no captions, clean video, no music.'
+            desc_instruction_2 = f"Generate a hyper-detailed character description in ENGLISH based on this concept: '{character2_concept_pt}'. You MUST include details for: Age and Ethnicity, Facial Structure, Eyes, Hair, Skin Details, Physique, Clothing, and Defining Expression."
+            desc_text_2 = generate_ia_content(desc_instruction_2)
+            
+            action_instruction_2 = f"The overall scene context is '{scene_action_text}'. A character just said '{dialogue_text_1}'. Now, another character described as '{desc_text_2}' is about to say '{dialogue2_text_pt}'. Describe in ENGLISH the second character's physical action and reaction."
+            action_text_2 = generate_ia_content(action_instruction_2)
 
-            **3. FINAL PROMPT STRUCTURE:**
-            **Visuals:** ...
-            **Scene:** ...
-            **Character:** ...
-            **Action:** ...
-            **Technical:** ...
+            if use_slang_text == 'Sim':
+                slang_instruction_2 = f"Rephrase the following portuguese dialogue to include authentic slang for a '{accent_text}' accent, keeping the core meaning: '{dialogue2_text_pt}'"
+                dialogue_text_2 = generate_ia_content(slang_instruction_2)
+            else:
+                dialogue_text_2 = dialogue2_text_pt
+        
+        visuals_instruction = f"Generate a descriptive sentence in ENGLISH for 'Visuals' by creatively combining these concepts: Atmosphere '{data.get('atmosphere')}' and Visual Style '{data.get('visual_style')}'."
+        visuals_text = generate_ia_content(visuals_instruction)
 
-            **MANDATORY CHARACTER DETAIL CHECKLIST (Apply to the character's Description):**
-            Invent: Age and Ethnicity, Facial Structure, Eyes, Hair, Skin Details, Physique, Clothing, and Defining Expression.
-            """
-        
-        print("--- PASSO 2: Prompt montado. Enviando para a IA do Gemini... ---")
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(instruction)
-        print("--- PASSO 3: Resposta da IA recebida! ---")
-        
-        prompt_text = response.text
-        
-        print("--- PASSO 4: Retornando JSON para o frontend. ---")
-        return jsonify({'prompt': prompt_text})
+        cctv_instruction = "For the Scene description, you MUST describe the shot as being 'from a high corner of the room, slightly tilted down, creating a sense of distant, detached surveillance'." if "CCTV" in data.get('camera_style', '') else ""
+        scene_instruction = f"Generate a hyper-detailed paragraph in ENGLISH describing a scene. The concept is '{location_concept_pt}'. The date is {data.get('date')}. {cctv_instruction}"
+        scene_text = generate_ia_content(scene_instruction)
+
+        # --- MONTAGEM FINAL (FEITA PELO PYTHON) ---
+        character_1_block = f"""Character 1:
+- Description: {desc_text_1.strip()}
+- Action: {action_text_1.strip()}
+- Dialogue: "{dialogue_text_1.strip()}"
+"""
+        character_2_block = ""
+        if character_count == '2':
+            character_2_block = f"""
+Character 2:
+- Description: {desc_text_2.strip()}
+- Action: {action_text_2.strip()}
+- Dialogue: "{dialogue_text_2.strip()}"
+"""
+        final_prompt = f"""
+Visuals: {visuals_text.strip()}
+
+Scene: {scene_text.strip()}
+
+{character_1_block.strip()}
+{character_2_block.strip()}
+
+Technical: {data.get('camera_style')}, no captions, clean video, no music.
+"""
+        # GERAÇÃO DO TÍTULO INTELIGENTE
+        title_instruction = f"Read the following detailed scene prompt and summarize it in a short, human-readable title of no more than 6-8 words in Portuguese. Example: 'Detetive investiga cena do crime à noite'. Here is the prompt: {final_prompt}"
+        title_text = generate_ia_content(title_instruction)
+
+        return jsonify({'prompt': final_prompt.strip(), 'title': title_text.strip()})
 
     except Exception as e:
-        print(f"--- ERRO DETALHADO NO BACKEND: {e} ---")
+        print(f"Erro detalhado no servidor: {e}")
         return jsonify({'error': 'Ocorreu um erro no servidor ao gerar o prompt.'}), 500
 
+# --- ROTAS DA BIBLIOTECA DE PERSONAGENS ---
 @app.route('/save-character', methods=['POST'])
 def save_character():
-    try:
-        data = request.json
-        name = data.get('name')
-        description = data.get('description')
-        if not all([name, description]):
-            return jsonify({'success': False, 'error': 'Dados incompletos.'}), 400
-        existing_char = SavedCharacter.query.filter_by(name=name).first()
-        if existing_char:
-            return jsonify({'success': False, 'error': f'Já existe um personagem chamado "{name}".'}), 400
-        new_char = SavedCharacter(name=name, description=description)
-        db.session.add(new_char)
-        db.session.commit()
-        return jsonify({'success': True, 'message': f'Personagem "{name}" salvo com sucesso!'})
-    except Exception as e:
-        db.session.rollback()
-        print(f"Erro ao salvar personagem: {e}")
-        return jsonify({'success': False, 'error': 'Erro interno do servidor.'}), 500
+    data = request.json
+    name = data.get('name')
+    description = data.get('description')
+    if not name or not description: return jsonify({'error': 'Nome e descrição são necessários.'}), 400
+    if SavedCharacter.query.filter_by(name=name).first(): return jsonify({'error': f'Já existe um personagem salvo com o nome "{name}".'}), 400
+    new_character = SavedCharacter(name=name, description=description)
+    db.session.add(new_character)
+    db.session.commit()
+    return jsonify({'success': True, 'message': f'Personagem "{name}" salvo com sucesso!'})
 
 @app.route('/characters', methods=['GET'])
 def get_characters():
-    try:
-        characters = SavedCharacter.query.order_by(SavedCharacter.name).all()
-        character_names = [char.name for char in characters]
-        return jsonify(character_names)
-    except Exception as e:
-        print(f"Erro ao buscar personagens: {e}")
-        return jsonify([]), 500
+    characters = SavedCharacter.query.order_by(SavedCharacter.name).all()
+    return jsonify([{'id': char.id, 'name': char.name} for char in characters])
 
-@app.route('/character/<name>', methods=['GET'])
-def get_character_details(name):
-    try:
-        character = SavedCharacter.query.filter_by(name=escape(name)).first()
-        if character:
-            return jsonify({'name': character.name, 'description': character.description})
-        else:
-            return jsonify({'error': 'Personagem não encontrado.'}), 404
-    except Exception as e:
-        print(f"Erro ao buscar detalhes do personagem: {e}")
-        return jsonify({'error': 'Erro interno do servidor.'}), 500
+@app.route('/character/<int:character_id>', methods=['GET'])
+def get_character(character_id):
+    character = db.session.get(SavedCharacter, character_id)
+    return jsonify({'id': character.id, 'name': character.name, 'description': character.description}) if character else jsonify({'error': 'Personagem não encontrado.'}), 404
 
-@app.route('/character/<name>', methods=['DELETE'])
-def delete_character(name):
-    try:
-        character = SavedCharacter.query.filter_by(name=escape(name)).first()
-        if character:
-            db.session.delete(character)
-            db.session.commit()
-            return jsonify({'success': True, 'message': f'Personagem "{name}" apagado com sucesso.'})
-        else:
-            return jsonify({'success': False, 'error': 'Personagem não encontrado.'}), 404
-    except Exception as e:
-        db.session.rollback()
-        print(f"Erro ao apagar personagem: {e}")
-        return jsonify({'success': False, 'error': 'Erro interno do servidor.'}), 500
+@app.route('/character/<int:character_id>', methods=['DELETE'])
+def delete_character(character_id):
+    character = db.session.get(SavedCharacter, character_id)
+    if character:
+        db.session.delete(character)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Personagem apagado com sucesso.'})
+    return jsonify({'error': 'Personagem não encontrado.'}), 404
+
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000)
