@@ -1,0 +1,189 @@
+{% extends "layout.html" %}
+
+{% block title %}Oficina Criativa{% endblock %}
+
+{% block head_styles %}
+<style>
+    h1 { text-align: center; color: var(--text-color); font-weight: 700; margin-bottom: 2rem; }
+    h1 span { color: var(--primary-color); }
+    h2 { margin-top: 2rem; color: var(--primary-color); opacity: 0.9; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1.5rem; font-size: 1.5rem; }
+    h3 { border: none; margin: 0; font-size: 1.2rem; }
+    .form-section { margin-bottom: 1.5rem; }
+    .side-by-side { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+    @media (min-width: 768px) { .side-by-side { grid-template-columns: 1fr 1fr; } }
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+    label { font-weight: 500; color: #aeb9c5; }
+    input, select, textarea { background-color: var(--surface-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-size: 1rem; width: 100%; box-sizing: border-box; }
+    textarea { resize: vertical; height: 150px; }
+    textarea[readonly] { background-color: #101820; color: #aeb9c5; cursor: not-allowed; }
+    .small-button { font-size: 1rem; padding: 10px 15px; background-color: var(--success-color); color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
+    .small-button:disabled { background-color: #555; cursor: not-allowed; }
+    .main-button { width: 100%; margin-top: 2rem; padding: 15px; background-color: var(--primary-color); color: var(--button-text-dark); border: none; border-radius: 8px; font-size: 1.1rem; font-weight: 700; cursor: pointer; }
+    .tray { display: flex; flex-wrap: wrap; gap: 0.75rem; min-height: 40px; padding: 0.75rem; background-color: var(--surface-color); border: 1px dashed var(--border-color); border-radius: 8px; margin-bottom: 1.5rem; }
+    .chip { display: inline-flex; align-items: center; background-color: var(--border-color); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 20px; font-weight: 500; max-width: 100%; }
+    .chip-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chip button { margin-left: 10px; background-color: var(--danger-color); border:none; color:white; border-radius:50%; width:22px; height:22px; cursor:pointer; display:flex; justify-content:center; align-items:center; line-height: 20px; font-weight: bold; flex-shrink: 0;}
+    .editor-header { display:flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+    <h1>Oficina <span>Criativa</span></h1>
+    <p style="text-align: center; margin-top: -1.5rem; color: #aeb9c5;">Etapa 1 de 3: Geração de Ativos</p>
+    <form id="creative-form" method="POST" action="{{ url_for('oficina') }}">
+        <input type="hidden" name="scene_characters_data" id="scene-characters-data">
+        <input type="hidden" name="scene_scenario_data" id="scene-scenario-data">
+        
+        <div class="form-section full-width">
+            <h2>Personagens</h2>
+            <div id="character-tray" class="tray"></div>
+            <div id="character-editor">
+                 <div class="side-by-side">
+                    <div class="form-group">
+                        <label for="character-concept-input">Conceito do Personagem</label>
+                        <textarea id="character-concept-input" placeholder="Ex: Um pirata caolha com um papagaio robô..."></textarea>
+                        <button type="button" class="small-button" id="add-character-btn" onclick="addCharacter()" style="width: fit-content;">+ Gerar e Adicionar à Cena</button>
+                    </div>
+                    <div class="form-group">
+                        <label>Fichas Técnicas Geradas (Personagens)</label>
+                        <textarea id="character-description-log" readonly placeholder="As fichas técnicas dos personagens adicionados aparecerão aqui..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <hr style="border-color: var(--border-color); margin: 3rem 0;">
+
+        <div class="form-section full-width">
+            <h2>Cenário</h2>
+            <div class="side-by-side">
+                <div class="form-group">
+                    <label for="scenario-concept-input">Conceito do Cenário</label>
+                    <input type="text" id="scenario-concept-input" placeholder="Ex: Um farol abandonado durante uma tempestade">
+                     <button type="button" class="small-button" id="generate-scenario-btn" onclick="generateScene()" style="width: fit-content;">+ Gerar Detalhes</button>
+                </div>
+                <div class="form-group">
+                    <label for="scenario-description-output">Ficha Técnica do Cenário (Gerada pela IA)</label>
+                    <textarea id="scenario-description-output" readonly placeholder="A ficha técnica do cenário aparecerá aqui..."></textarea>
+                </div>
+            </div>
+        </div>
+        <hr style="border-color: var(--border-color); margin: 2rem 0;">
+        <button type="submit" class="main-button">Próximo: Detalhes Finais e Roteiro →</button>
+    </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let sceneCharacters = {{ saved_characters|tojson }};
+    let sceneScenario = {{ saved_scenario|tojson }};
+    let nextCharacterId = 1;
+
+    function renderCharacterTray() {
+        const tray = document.getElementById('character-tray');
+        const log = document.getElementById('character-description-log');
+        tray.innerHTML = '';
+        let logText = '';
+        sceneCharacters.forEach(char => {
+            const chip = document.createElement('div');
+            chip.className = 'chip';
+            chip.title = char.concept;
+            const chipText = document.createElement('span');
+            chipText.className = 'chip-text';
+            chipText.innerText = char.name;
+            chip.appendChild(chipText);
+            const removeBtn = document.createElement('button');
+            removeBtn.innerHTML = '&times;';
+            removeBtn.onclick = (e) => { e.preventDefault(); removeCharacter(char.id); };
+            chip.appendChild(removeBtn);
+            tray.appendChild(chip);
+            logText += `--- ${char.name} ---\n${char.description}\n\n`;
+        });
+        log.value = logText.trim();
+    }
+
+    async function addCharacter() {
+        const conceptInput = document.getElementById('character-concept-input');
+        const concept = conceptInput.value.trim();
+        if (!concept) { alert('Por favor, digite o conceito do personagem.'); return; }
+        const addButton = document.getElementById('add-character-btn');
+        addButton.disabled = true;
+        addButton.innerText = 'Gerando...';
+        try {
+            // Chamada 1: Gerar a descrição detalhada
+            const descPromise = fetch("{{ url_for('generate_character_description') }}", {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ concept: concept })
+            }).then(res => res.json());
+            
+            // Chamada 2: Gerar o resumo (nome curto)
+            const summaryPromise = fetch("{{ url_for('generate_summary') }}", {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ concept: concept })
+            }).then(res => res.json());
+
+            // Espera as duas chamadas terminarem
+            const [descData, summaryData] = await Promise.all([descPromise, summaryPromise]);
+
+            if (descData.error || summaryData.error) {
+                throw new Error(descData.error || summaryData.error);
+            }
+
+            const characterData = { 
+                id: nextCharacterId++, 
+                name: summaryData.summary,
+                concept: concept,
+                description: descData.description
+            };
+            sceneCharacters.push(characterData);
+            renderCharacterTray();
+            conceptInput.value = '';
+        } catch (error) { 
+            alert(`Erro: ${error.message}`);
+        } finally { 
+            addButton.disabled = false; 
+            addButton.innerText = '+ Gerar e Adicionar à Cena'; 
+        }
+    }
+    
+    function removeCharacter(id) {
+        sceneCharacters = sceneCharacters.filter(char => char.id !== id);
+        renderCharacterTray();
+    }
+    
+    async function generateScene() {
+        const conceptInput = document.getElementById('scenario-concept-input');
+        const concept = conceptInput.value.trim();
+        if (!concept) { alert('Por favor, digite o conceito do cenário.'); return; }
+        const genButton = document.getElementById('generate-scenario-btn');
+        genButton.disabled = true;
+        genButton.innerText = 'Gerando...';
+        try {
+            const response = await fetch("{{ url_for('generate_scene_description') }}", {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ concept: concept })
+            });
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+            document.getElementById('scenario-description-output').value = data.description;
+            sceneScenario = { concept: concept, description: data.description };
+        } catch (error) { alert(`Erro: ${error.message}`);
+        } finally { genButton.disabled = false; genButton.innerText = '+ Gerar Detalhes'; }
+    }
+
+    function prepareFormSubmit() {
+        document.getElementById('scene-characters-data').value = JSON.stringify(sceneCharacters);
+        document.getElementById('scene-scenario-data').value = JSON.stringify(sceneScenario);
+        return true; 
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (sceneScenario && sceneScenario.concept) {
+            document.getElementById('scenario-concept-input').value = sceneScenario.concept;
+            document.getElementById('scenario-description-output').value = sceneScenario.description;
+        }
+        renderCharacterTray();
+        document.getElementById('creative-form').addEventListener('submit', prepareFormSubmit);
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,151 @@
+{% extends "layout.html" %}
+
+{% block title %}Etapa 2: Roteiro e Detalhes{% endblock %}
+
+{% block head_styles %}
+<style>
+    h1 { text-align: center; color: var(--text-color); font-weight: 700; margin-bottom: 2rem; }
+    h1 span { color: var(--primary-color); }
+    h2 { margin-top: 2rem; color: var(--primary-color); opacity: 0.9; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1.5rem; font-size: 1.5rem; }
+    .form-section { margin-bottom: 1.5rem; }
+    .form-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+    @media (min-width: 768px) { .form-grid { grid-template-columns: 1fr 1fr; } }
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+    label { font-weight: 500; color: #aeb9c5; }
+    input, select, textarea { background-color: var(--surface-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-size: 1rem; width: 100%; box-sizing: border-box; }
+    textarea { resize: vertical; height: 60px; }
+    .main-button { width: 100%; margin-top: 1rem; padding: 15px; background-color: var(--primary-color); color: var(--button-text-dark); border: none; border-radius: 8px; font-size: 1.1rem; font-weight: 700; cursor: pointer; }
+    .small-button { font-size: 1rem; padding: 10px 15px; background-color: var(--success-color); color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
+    .button-group { display: flex; gap: 1rem; margin-top: 2rem; }
+    .back-button { background-color: var(--border-color); color: var(--text-color); flex-grow: 0.5; }
+    .next-button { flex-grow: 2; }
+    .summary-box { background-color: var(--surface-color); border-left: 4px solid var(--primary-color); padding: 1rem 1.5rem; border-radius: 8px; margin-bottom: 2rem; }
+    .summary-box p { margin: 0; }
+    .summary-box strong { color: var(--primary-color); }
+    .dialogue-line { display: grid; grid-template-columns: 1fr 3fr auto; gap: 1rem; align-items: flex-end; margin-bottom: 1rem; }
+    .delete-btn { background-color: var(--danger-color); color: white; border: none; border-radius: 8px; padding: 12px; cursor: pointer; height: fit-content; }
+</style>
+{% endblock %}
+
+{% block content %}
+    <h1>Roteiro e <span>Detalhes Finais</span></h1>
+    <p style="text-align: center; margin-top: -1.5rem; color: #aeb9c5;">Etapa 2 de 3: Adição de Diálogo e Ajustes</p>
+
+    <div class="summary-box">
+        <p><strong>Personagens Definidos:</strong> {{ session.get('characters', [])|map(attribute='name')|join(', ') }}</p>
+        <p style="margin-top: 0.5rem;"><strong>Cenário Definido:</strong> {{ session.get('scenario', {}).get('concept', 'Nenhum') }}</p>
+    </div>
+
+    <form id="details-form" method="POST" action="{{ url_for('detalhes') }}">
+        <input type="hidden" name="dialogue_data" id="dialogue-data">
+
+        <div class="form-section full-width">
+            <h2>Contexto da Ação</h2>
+            <div class="form-group">
+                <label for="action_context">O que está acontecendo na cena?</label>
+                <input type="text" id="action_context" name="action_context" placeholder="Ex: Uma discussão sobre um mapa antigo" value="{{ session.get('details', {}).get('action_context', '') }}">
+            </div>
+        </div>
+
+        <div class="form-section full-width">
+            <h2>Sequência de Diálogo</h2>
+            <div id="dialogue-list">
+                </div>
+            <button type="button" class="small-button" style="width: auto; margin-top: 1rem;" onclick="addDialogueLine()">+ Adicionar Fala</button>
+        </div>
+        
+        <hr style="border-color: var(--border-color); margin: 2rem 0;">
+
+        <div class="form-section full-width">
+            <h2>Ajustes Finais</h2>
+            <div class="form-grid">
+                 <div class="form-group">
+                    <label>Idioma (Geral)</label>
+                    <select id="language" name="language"><option value="Português (Brasil)">Português (Brasil)</option><option value="Inglês">Inglês</option></select>
+                </div>
+                <div class="form-group">
+                    <label>Sotaque (Geral)</label>
+                    <select id="accent" name="accent"><option value="Neutro Brasileiro">Neutro</option><option value="Carioca">Carioca</option><option value="Paulista">Paulista</option></select>
+                </div>
+                 <div class="form-group">
+                    <label>Estilo da Câmera</label>
+                    <select id="camera_style" name="camera_style"><option value="Stable, locked-down tripod shot">Câmera Fixa</option><option value="Sweeping cinematic drone shot">Drone</option></select>
+                </div>
+                <div class="form-group">
+                    <label>Estilo Visual</label>
+                    <select id="visual_style" name="visual_style"><option value="Hyper-realistic, cinematic, 8K">Hiper-Realista</option><option value="3D Animation, Pixar-style">Animação 3D</option></select>
+                </div>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <a href="{{ url_for('oficina') }}" class="main-button back-button" style="text-align: center; text-decoration: none;">&larr; Voltar à Oficina</a>
+            <button type="submit" class="main-button next-button">Próximo: Ver Resumo Final &rarr;</button>
+        </div>
+    </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const charactersInScene = {{ session.get('characters', [])|tojson }};
+    const savedDetails = {{ session.get('details', {})|tojson }};
+    let dialogueLines = [];
+
+    function addDialogueLine(charId = '', text = '') {
+        const list = document.getElementById('dialogue-list');
+        const lineId = Date.now();
+        const lineDiv = document.createElement('div');
+        lineDiv.className = 'dialogue-line';
+        lineDiv.id = `line-${lineId}`;
+
+        let options = charactersInScene.map(char => `<option value="${char.id}" ${char.id == charId ? 'selected' : ''}>${char.name}</option>`).join('');
+
+        lineDiv.innerHTML = `
+            <div class="form-group">
+                <label>Personagem</label>
+                <select class="dialogue-char-select">${options}</select>
+            </div>
+            <div class="form-group">
+                <label>Fala</label>
+                <textarea class="dialogue-text-input" placeholder="Digite a fala...">${text}</textarea>
+            </div>
+            <button type="button" class="delete-btn" onclick="removeDialogueLine(${lineId})">&times;</button>
+        `;
+        list.appendChild(lineDiv);
+    }
+
+    function removeDialogueLine(lineId) {
+        const line = document.getElementById(`line-${lineId}`);
+        if (line) line.remove();
+    }
+    
+    document.getElementById('details-form').addEventListener('submit', function(e) {
+        dialogueLines = [];
+        const dialogueElements = document.getElementById('dialogue-list').children;
+        for (let line of dialogueElements) {
+            const charId = line.querySelector('.dialogue-char-select').value;
+            const text = line.querySelector('.dialogue-text-input').value;
+            if (charId && text) {
+                dialogueLines.push({ charId: parseInt(charId), text: text });
+            }
+        }
+        document.getElementById('dialogue-data').value = JSON.stringify(dialogueLines);
+    });
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Preenche os campos com dados da sessão, se existirem (para o botão 'Voltar')
+        if (savedDetails.dialogues && savedDetails.dialogues.length > 0) {
+            savedDetails.dialogues.forEach(d => addDialogueLine(d.charId, d.text));
+        } else if (charactersInScene.length > 0) {
+            addDialogueLine();
+        }
+        
+        // Preenche os selects
+        for(const key of ['language', 'accent', 'camera_style', 'visual_style']) {
+            if (savedDetails[key]) {
+                document.getElementById(key).value = savedDetails[key];
+            }
+        }
+    });
+</script>
+{% endblock %}

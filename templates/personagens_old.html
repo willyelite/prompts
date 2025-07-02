@@ -1,0 +1,156 @@
+{% extends "layout.html" %}
+
+{% block title %}Etapa 1: Personagens{% endblock %}
+
+{% block head_styles %}
+<style>
+    /* Estilos específicos para esta página */
+    h1 { text-align: center; color: var(--text-color); font-weight: 700; margin-bottom: 2rem; }
+    h1 span { color: var(--primary-color); }
+    h2 { margin-top: 2rem; color: var(--primary-color); opacity: 0.9; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1.5rem; font-size: 1.5rem; }
+    .form-section { margin-bottom: 1.5rem; }
+    .side-by-side { display: flex; flex-direction: column; gap: 1.5rem; }
+    @media (min-width: 900px) { .side-by-side { flex-direction: row; } }
+    .side-by-side .form-group { flex: 1; }
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+    label { font-weight: 500; color: #aeb9c5; }
+    input, select, textarea { background-color: var(--surface-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-size: 1rem; width: 100%; box-sizing: border-box; }
+    textarea { resize: vertical; height: 100px; }
+    .small-button { font-size: 1rem; padding: 10px 15px; background-color: var(--success-color); color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
+    .small-button:disabled { background-color: #555; cursor: not-allowed; }
+    .main-button { width: 100%; margin-top: 1rem; padding: 15px; background-color: var(--primary-color); color: var(--button-text-dark); border: none; border-radius: 8px; font-size: 1.1rem; font-weight: 700; cursor: pointer; }
+    .character-tray-wrapper { margin-bottom: 2rem; }
+    #character-tray { display: flex; flex-wrap: wrap; gap: 0.75rem; min-height: 40px; padding: 0.75rem; background-color: var(--surface-color); border: 1px dashed var(--border-color); border-radius: 8px; }
+    .character-chip { display: flex; align-items: center; background-color: var(--border-color); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 20px; font-weight: 500; }
+    .character-chip button { margin-left: 10px; background-color: var(--danger-color); border:none; color:white; border-radius:50%; width:22px; height:22px; cursor:pointer; display:flex; justify-content:center; align-items:center; line-height: 20px; font-weight: bold;}
+    .character-editor-header { display:flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+    <h1>Etapa 1: <span>Personagens</span></h1>
+
+    <form id="characters-form" method="POST" action="{{ url_for('personagens') }}" onsubmit="prepareFormSubmit()">
+        
+        <input type="hidden" name="scene_characters_data" id="scene-characters-data">
+        
+        <div class="form-section full-width">
+            <h2>Personagens na Cena</h2>
+            <div id="character-tray" class="character-tray-wrapper">
+                </div>
+        </div>
+        
+        <div class="form-section full-width" id="character-editor">
+            <div class="character-editor-header">
+                <h2 id="character-editor-title" style="border: none; margin: 0;">Adicionar Personagem 1</h2>
+                <button type="button" class="small-button" id="add-character-btn" onclick="addCharacter()">+ Gerar e Adicionar</button>
+            </div>
+            <div class="side-by-side">
+                <div class="form-group">
+                    <label for="character-concept-input">Conceito do Personagem</label>
+                    <textarea id="character-concept-input" placeholder="Ex: Um pirata aposentado que agora cuida de um farol..."></textarea>
+                </div>
+            </div>
+        </div>
+
+        <hr style="border-color: var(--border-color); margin: 2rem 0;">
+
+        <button type="submit" class="main-button">Próximo: Definir Cenário →</button>
+    </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // <<< CORREÇÃO DE ROBUSTEZ AQUI >>>
+    let sceneCharacters = {{ saved_characters|default([])|tojson }};
+    let nextCharacterId = 1;
+
+    function prepareFormSubmit() {
+        document.getElementById('scene-characters-data').value = JSON.stringify(sceneCharacters);
+        return true;
+    }
+
+    async function addCharacter() {
+        const descInput = document.getElementById('character-concept-input');
+        const concept = descInput.value.trim();
+        if (!concept) {
+            alert('Por favor, digite o conceito do personagem primeiro.');
+            return;
+        }
+
+        const addButton = document.getElementById('add-character-btn');
+        addButton.disabled = true;
+        addButton.innerText = 'Gerando...';
+
+        try {
+            const response = await fetch("{{ url_for('generate_character_description') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ concept: concept })
+            });
+
+            if (!response.ok) { throw new Error('Falha ao gerar descrição.'); }
+            const data = await response.json();
+            if (data.error) { throw new Error(data.error); }
+
+            const characterData = {
+                id: nextCharacterId,
+                name: `Personagem ${nextCharacterId}`,
+                concept: concept,
+                description: data.description,
+                summary: concept.split(' ').slice(0, 3).join(' ') + '...'
+            };
+            sceneCharacters.push(characterData);
+            renderCharacterTray();
+            
+            descInput.value = '';
+            updateEditorState();
+            descInput.placeholder = `Conceito do Personagem ${nextCharacterId}...`;
+
+        } catch (error) {
+            alert(`Erro: ${error.message}`);
+        } finally {
+            addButton.disabled = false;
+            addButton.innerText = '+ Gerar e Adicionar';
+        }
+    }
+
+    function renderCharacterTray() {
+        const tray = document.getElementById('character-tray');
+        tray.innerHTML = '';
+        sceneCharacters.forEach(char => {
+            const chip = document.createElement('div');
+            chip.className = 'character-chip';
+            chip.innerText = `${char.name}: ${char.summary}`;
+            chip.title = char.description;
+            const removeBtn = document.createElement('button');
+            removeBtn.innerHTML = '&times;';
+            removeBtn.onclick = (e) => { e.preventDefault(); removeCharacter(char.id); };
+            chip.appendChild(removeBtn);
+            tray.appendChild(chip);
+        });
+    }
+
+    function updateEditorState() {
+        const existingIds = sceneCharacters.map(c => c.id);
+        let nextId = 1;
+        while (existingIds.includes(nextId)) {
+            nextId++;
+        }
+        nextCharacterId = nextId;
+        document.getElementById('character-editor-title').innerText = `Adicionar Personagem ${nextId}`;
+    }
+
+    function removeCharacter(id) {
+        sceneCharacters = sceneCharacters.filter(char => char.id !== id);
+        renderCharacterTray();
+        updateEditorState();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        renderCharacterTray();
+        updateEditorState();
+        document.getElementById('characters-form').addEventListener('submit', prepareFormSubmit);
+    });
+</script>
+{% endblock %}

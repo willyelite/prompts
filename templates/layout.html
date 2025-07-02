@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Gerador de Prompts{% endblock %}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        :root {
+            --bg-color: #0D1B2A; --surface-color: #1B263B; --primary-color: #FFC107;
+            --text-color: #E0E1DD; --border-color: #415A77; --danger-color: #D9534F;
+            --success-color: #198754; --info-color: #0dcaf0; --button-text-dark: #121212;
+        }
+        body { 
+            font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color); 
+            margin: 0; padding: 1rem; padding-top: 6rem;
+            display: flex; flex-direction: column; min-height: 100vh; box-sizing: border-box;
+        }
+        @media (min-width: 768px) { body { padding: 2rem; padding-top: 6rem; } }
+        .main-nav {
+            position: fixed; top: 0; left: 0; width: 100%;
+            background-color: rgba(13, 27, 42, 0.85); backdrop-filter: blur(10px);
+            z-index: 1000; padding: 0.75rem 1rem; box-sizing: border-box;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .nav-container { max-width: 900px; margin: auto; display: flex; justify-content: flex-end; align-items: center; gap: 1.5rem; }
+        .nav-user-info { color: #aeb9c5; font-size: 0.9rem; margin-right: auto; }
+        .nav-user-info strong { color: var(--text-color); }
+        .nav-link { color: var(--primary-color); text-decoration: none; font-weight: 500; padding: 0.5rem 1rem; border: 1px solid var(--primary-color); border-radius: 6px; transition: background-color 0.2s, color 0.2s; }
+        .nav-link:hover { background-color: var(--primary-color); color: var(--button-text-dark); }
+        .nav-link.logout { border-color: var(--danger-color); color: var(--danger-color); }
+        .nav-link.logout:hover { background-color: var(--danger-color); color: white; }
+        .container { max-width: 900px; margin: 0 auto; width: 100%; flex-grow: 1; }
+        .footer-counter { text-align: center; color: #666; font-size: 0.9rem; margin-top: 3rem; padding: 2rem 0 1rem 0; border-top: 1px solid var(--border-color); }
+        
+        /* Estilos para as mensagens flash */
+        .alert { padding: 1rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: 8px; text-align: center; font-weight: 500;}
+        .alert-success { color: #d1e7dd; background-color: #0f5132; border-color: #badbcc; }
+        .alert-danger { color: #f8d7da; background-color: #842029; border-color: #f5c2c7; }
+        .alert-info { color: #cff4fc; background-color: #055160; border-color: #b6effb; }
+    </style>
+    {% block head_styles %}{% endblock %}
+</head>
+<body>
+    <nav class="main-nav">
+        <div class="nav-container">
+            {% if current_user.is_authenticated %}
+                <span class="nav-user-info">Logado como: <strong>{{ current_user.email }}</strong></span>
+                <a href="{{ url_for('logout') }}" class="nav-link logout">Sair</a>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="nav-link">Login</a>
+                <a href="{{ url_for('register') }}" class="nav-link">Cadastrar</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer-counter">
+        <p>Synthetica Studios © 2025</p>
+    </footer>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

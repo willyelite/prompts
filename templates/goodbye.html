@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+
+{% block title %}Até Logo!{% endblock %}
+
+{% block content %}
+<style>
+    .goodbye-container {
+        text-align: center;
+        padding: 4rem 1rem;
+        background-color: var(--surface-color);
+        border-radius: 12px;
+    }
+    .goodbye-container h1 {
+        color: var(--primary-color);
+        margin-bottom: 1rem;
+    }
+    .goodbye-container p {
+        font-size: 1.1rem;
+        color: #aeb9c5;
+        margin-bottom: 2rem;
+    }
+    .main-button {
+        width: auto;
+        padding: 15px 30px;
+        background-color: var(--primary-color);
+        color: var(--button-text-dark);
+        border: none;
+        border-radius: 8px;
+        font-size: 1.1rem;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+    }
+</style>
+
+<div class="goodbye-container">
+    <h1>Desconectado com Sucesso!</h1>
+    <p>Sua sessão foi encerrada com segurança.</p>
+    <a href="{{ url_for('login') }}" class="main-button">Fazer Login Novamente</a>
+</div>
+{% endblock %}
