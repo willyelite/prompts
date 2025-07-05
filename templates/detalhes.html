@@ -61,19 +61,61 @@
             <div class="form-grid">
                  <div class="form-group">
                     <label>Idioma (Geral)</label>
-                    <select id="language" name="language"><option value="Português (Brasil)">Português (Brasil)</option><option value="Inglês">Inglês</option></select>
+                    <select id="language" name="language">
+                        <option value="Português (Brasil)">Português (Brasil)</option>
+                        <option value="Inglês">Inglês</option>
+                        <option value="Espanhol">Espanhol</option>
+                        <option value="Francês">Francês</option>
+                        <option value="Alemão">Alemão</option>
+                        <option value="Japonês">Japonês</option>
+                        <option value="Italiano">Italiano</option>
+                        <option value="Coreano">Coreano</option>
+                        <option value="Mandarim">Mandarim</option>
+                    </select>
                 </div>
                 <div class="form-group">
-                    <label>Sotaque (Geral)</label>
-                    <select id="accent" name="accent"><option value="Neutro Brasileiro">Neutro</option><option value="Carioca">Carioca</option><option value="Paulista">Paulista</option></select>
+                    <label>Sotaque (Para Português)</label>
+                    <select id="accent" name="accent">
+                        <option value="Neutro Brasileiro">Neutro (Padrão)</option>
+                        <option value="Carioca">Carioca</option>
+                        <option value="Paulista">Paulista</option>
+                        <option value="Gaúcho">Gaúcho</option>
+                        <option value="Mineiro">Mineiro</option>
+                        <option value="Baiano">Baiano</option>
+                        <option value="Nordestino (Geral)">Nordestino (Geral)</option>
+                        <option value="Foreigner accent (Gringo)">Sotaque de Estrangeiro (Gringo)</option>
+                    </select>
                 </div>
                  <div class="form-group">
                     <label>Estilo da Câmera</label>
-                    <select id="camera_style" name="camera_style"><option value="Stable, locked-down tripod shot">Câmera Fixa</option><option value="Sweeping cinematic drone shot">Drone</option></select>
+                    <select id="camera_style" name="camera_style">
+                        <option value="Stable, locked-down tripod shot">Câmera Fixa</option>
+                        <option value="Sweeping cinematic drone shot">Drone Cinematográfico</option>
+                        <option value="Selfie-style shot, with the character holding the camera">Câmera (Estilo Selfie)</option>
+                        <option value="Shaky, handheld camera, documentary-style">Câmera de Mão (Documentário)</option>
+                        <option value="Smooth tracking shot following the character">Plano Sequência (Travelling)</option>
+                        <option value="First-person point-of-view (POV) shot">Ponto de Vista (POV)</option>
+                        <option value="Dramatic slow-motion">Câmera Lenta (Slow Motion)</option>
+                        <option value="Timelapse showing the passage of time">Timelapse</option>
+                        <option value="Low-angle shot, making the character look powerful">Ângulo Baixo (Contra-plongée)</option>
+                        <option value="High-angle shot looking down">Ângulo Alto (Plongée)</option>
+                        <option value="Dolly zoom / Vertigo effect">Dolly Zoom (Efeito Vertigo)</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Estilo Visual</label>
-                    <select id="visual_style" name="visual_style"><option value="Hyper-realistic, cinematic, 8K">Hiper-Realista</option><option value="3D Animation, Pixar-style">Animação 3D</option></select>
+                    <select id="visual_style" name="visual_style">
+                        <option value="Hyper-realistic, cinematic, 8K">Hiper-Realista 8K</option>
+                        <option value="3D Animation, Pixar-style">Animação 3D (Estilo Pixar)</option>
+                        <option value="2D cartoon animation, modern flat design style">Desenho 2D (Cartoon Moderno)</option>
+                        <option value="Japanese Anime style, 90s aesthetic">Anime Japonês (Anos 90)</option>
+                        <option value="Black and white, film noir style">Film Noir (Preto e Branco)</option>
+                        <option value="Cyberpunk, neon-drenched, Blade Runner-style">Cyberpunk (Neon e Chuva)</option>
+                        <option value="Epic fantasy, oil painting style">Fantasia Épica (Pintura a Óleo)</option>
+                        <option value="Claymation / Stop-motion style">Stop-Motion (Massinha)</option>
+                        <option value="Watercolor illustration style">Aquarela (Visual Suave)</option>
+                        <option value="Gothic horror, high contrast, Tim Burton-style">Terror Gótico (Estilo Tim Burton)</option>
+                    </select>
                 </div>
             </div>
         </div>
@@ -143,7 +185,10 @@
         // Preenche os selects
         for(const key of ['language', 'accent', 'camera_style', 'visual_style']) {
             if (savedDetails[key]) {
-                document.getElementById(key).value = savedDetails[key];
+                const selectElement = document.getElementById(key);
+                if(selectElement) {
+                   selectElement.value = savedDetails[key];
+                }
             }
         }
     });
