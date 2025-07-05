@@ -17,7 +17,7 @@
     .main-button { width: 100%; margin-top: 1rem; padding: 15px; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: background-color 0.2s ease; }
     .main-button:disabled { background-color: #555; cursor: not-allowed; }
     .button-group { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 2rem; }
-    .button-group .main-button { flex: 1 1 auto; } /* Permite que os botões se ajustem */
+    .button-group .main-button { flex: 1 1 auto; }
     .back-button { background-color: var(--border-color); color: var(--text-color); }
     .save-button { background-color: var(--info-color); color: white; }
     .assemble-button { background-color: var(--success-color); color: white; }
@@ -70,6 +70,9 @@
 
 {% block scripts %}
 <script>
+    // Dados do servidor são injetados de forma segura aqui, eliminando a necessidade do JSON.parse()
+    const serverData = {{ server_data|tojson|safe }};
+
     // Função para salvar os componentes na biblioteca
     async function saveComponents() {
         const saveBtn = document.getElementById('save-btn');
@@ -82,7 +85,7 @@
                 headers: { 'Content-Type': 'application/json' }
             });
             const data = await response.json();
-            alert(data.message); // Exibe a mensagem de sucesso ou aviso do servidor
+            alert(data.message);
         } catch (error) {
             alert(`Erro ao salvar: ${error.message}`);
         } finally {
@@ -91,59 +94,87 @@
         }
     }
 
-    // Função para montar o prompt final (já existente, com pequenas melhorias)
+    // Função para montar o prompt final (versão corrigida e robusta)
     async function assemblePrompt() {
         const assembleBtn = document.getElementById('assemble-btn');
         assembleBtn.disabled = true;
-        assembleBtn.innerText = 'Montando...';
+        assembleBtn.innerText = 'Montando... (Pode levar até 1 min)';
 
+        // --- MÉTODO CORRIGIDO E SEGURO PARA LER OS DADOS ---
+        // Usamos o objeto 'serverData' injetado diretamente, que já é um objeto JavaScript válido.
+        const originalCharacters = serverData.characters || [];
+        const details = serverData.details || {};
+        const originalScenario = serverData.scenario || {};
+        
         const editedScenarioDesc = document.getElementById('scenario-edit').value;
         const editedCharacters = [];
         
-        // --- CORREÇÃO APLICADA AQUI ---
-        // Método mais seguro para carregar dados do Jinja para o JavaScript
-        const originalCharacters = JSON.parse('{{ session.get("characters", [])|tojson|safe }}');
-        
         originalCharacters.forEach(char => {
-            editedCharacters.push({
-                id: char.id,
-                name: char.name,
-                description: document.getElementById(`char-edit-${char.id}`).value
-            });
+            const descriptionElement = document.getElementById(`char-edit-${char.id}`);
+            if (descriptionElement) {
+                editedCharacters.push({
+                    id: char.id,
+                    name: char.name,
+                    concept: char.concept, // Preserva o conceito original do personagem
+                    description: descriptionElement.value
+                });
+            }
         });
 
         const payload = {
             characters: editedCharacters,
-            scenario: { description: editedScenarioDesc },
-            // --- CORREÇÃO APLICADA AQUI ---
-            details: JSON.parse('{{ session.get("details", {})|tojson|safe }}')
+            scenario: { 
+                concept: originalScenario.concept || '', // Preserva o conceito original do cenário
+                description: editedScenarioDesc 
+            },
+            details: details
         };
 
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000); // Timeout de 60 segundos
+
             const response = await fetch("{{ url_for('montar_prompt') }}", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
+
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({'error': 'Erro desconhecido.'}));
-                throw new Error(errorData.error || 'Falha na montagem do prompt.');
+                const errorData = await response.json().catch(() => ({
+                    error: `Erro do servidor: ${response.status} ${response.statusText}`
+                }));
+                throw new Error(errorData.error || errorData.message || 'Falha na comunicação com o servidor.');
             }
+            
             const data = await response.json();
             
+            if (data.error) {
+                 throw new Error(data.error);
+            }
+
             document.getElementById('final-prompt-output').innerText = data.prompt;
             document.getElementById('result-wrapper').style.display = 'block';
             window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 
         } catch (error) {
-            alert(`Erro: ${error.message}`);
+            let errorMessage = 'Ocorreu um erro desconhecido.';
+            if (error.name === 'AbortError') {
+                errorMessage = 'A requisição demorou muito e foi cancelada. Por favor, tente novamente.';
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            alert(`Erro ao montar o prompt: ${errorMessage}`);
         } finally {
             assembleBtn.disabled = false;
             assembleBtn.innerText = 'Montar Prompt Final';
         }
     }
 
-    // Função para copiar o prompt (já existente)
+    // Função para copiar o prompt
     function copyPrompt() {
         const textToCopy = document.getElementById('final-prompt-output').innerText;
         navigator.clipboard.writeText(textToCopy).then(() => {
