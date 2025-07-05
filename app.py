@@ -9,6 +9,7 @@ from flask_login import LoginManager, UserMixin, login_user, current_user, logou
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
+from flask_session import Session
 
 # --- CONFIGURAÇÃO ---
 load_dotenv()
@@ -22,7 +23,15 @@ if not db_url: raise ValueError("DATABASE_URL not set")
 if db_url.startswith("postgres://"): db_url = db_url.replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# --- CONFIGURAÇÃO DO FLASK-SESSION ---
+app.config["SESSION_TYPE"] = "sqlalchemy"
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_USE_SIGNER"] = True
 db = SQLAlchemy(app)
+app.config["SESSION_SQLALCHEMY"] = db
+sess = Session(app)
+
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
@@ -71,7 +80,7 @@ class LoginForm(FlaskForm):
 
 with app.app_context():
     db.create_all()
-    
+
 # --- ROTAS DE AUTENTICAÇÃO ---
 @app.route("/login", methods=['GET', 'POST'])
 def login():
@@ -208,8 +217,13 @@ def carregar_da_biblioteca():
 @app.route('/save_components', methods=['POST'])
 @login_required
 def save_components():
-    characters = session.get('characters', [])
-    scenario = session.get('scenario', {})
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'message': 'Nenhum dado recebido.'}), 400
+
+    characters = data.get('characters', [])
+    scenario = data.get('scenario', {})
+    
     if not characters and not scenario.get('concept'):
         return jsonify({'success': False, 'message': 'Não há nada na sessão atual para salvar.'}), 400
     try:
@@ -260,7 +274,8 @@ def delete_asset(asset_type, asset_id):
 # --- MICRO-ROTAS E FUNÇÕES FINAIS (IA) ---
 def generate_ia_content(instruction):
     if not api_key: return "Erro: A chave da API do Gemini não foi configurada no servidor."
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # Use 'gemini-1.5-pro-latest' for higher quality results on a paid plan
+    model = genai.GenerativeModel('gemini-1.5-pro-latest')
     try:
         response = model.generate_content(instruction)
         return response.text.strip()
@@ -270,22 +285,21 @@ def generate_ia_content(instruction):
 @login_required
 def generate_character_description():
     concept = request.json.get('concept')
-    # ALTERAÇÃO AQUI: Instrução mais rigorosa para evitar formatação extra.
     instruction = f"""
-    Baseado no seguinte conceito, gere uma ficha técnica de personagem concisa EM PORTUGUÊS.
+    Gere uma ficha de personagem detalhada e rica em português, baseada no conceito a seguir.
     **REGRAS ESTRITAS:**
-    1. NÃO use markdown (como ** ou *).
-    2. NÃO escreva frases introdutórias ou de conclusão.
-    3. Responda APENAS com a lista de atributos, começando cada linha com um hífen.
+    1.  NÃO use markdown como '**' ou '##'.
+    2.  Use um formato de lista com hífens (-).
+    3.  Seja descritivo e vívido em cada item da lista.
+    4.  Responda APENAS com a lista de atributos, sem frases de introdução ou conclusão.
+
     **CONCEITO:** '{concept}'
-    **FORMATO OBRIGATÓRIO:**
-    - Idade: [valor]
-    - Etnia: [valor]
-    - Rosto: [valor]
-    - Olhos: [valor]
-    - Cabelo: [valor]
-    - Físico: [valor]
-    - Vestimenta: [valor]
+
+    **FORMATO OBRIGATÓRIO (Preencha com detalhes):**
+    - Aparência Geral: [Descreva a primeira impressão, idade aparente, etnia, físico e altura.]
+    - Rosto e Expressão: [Detalhe os traços faciais, cor e expressão dos olhos, estilo e cor do cabelo, e marcas distintas.]
+    - Vestimenta: [Descreva as roupas, incluindo tecido, corte, e estado (novas, gastas). Mencione acessórios importantes.]
+    - Postura e Linguagem Corporal: [Como o personagem se porta? Confiante, curvado, rígido? Como ele se move?]
     """
     description = generate_ia_content(instruction)
     return jsonify({'description': description})
@@ -294,19 +308,21 @@ def generate_character_description():
 @login_required
 def generate_scene_description():
     concept = request.json.get('concept')
-    # ALTERAÇÃO AQUI: Instrução mais rigorosa para evitar formatação extra.
     instruction = f"""
-    Baseado no seguinte conceito, gere uma ficha técnica de cenário concisa EM PORTUGUÊS.
+    Gere uma descrição de cenário detalhada e imersiva em português, baseada no conceito a seguir.
     **REGRAS ESTRITAS:**
-    1. NÃO use markdown (como ** ou *).
-    2. NÃO escreva frases introdutórias ou de conclusão.
-    3. Responda APENAS com a lista de atributos, começando cada linha com um hífen.
+    1.  NÃO use markdown como '**' ou '##'.
+    2.  Use um formato de lista com hífens (-).
+    3.  Foque em criar uma atmosfera forte e rica em detalhes em cada item.
+    4.  Responda APENAS com a lista de atributos, sem frases de introdução ou conclusão.
+
     **CONCEITO:** '{concept}'
-    **FORMATO OBRIGATÓRIO:**
-    - Localização: [valor]
-    - Elementos Chave: [valor]
-    - Iluminação: [valor]
-    - Atmosfera: [valor]
+
+    **FORMATO OBRIGATÓRIO (Preencha com detalhes):**
+    - Localização e Visão Geral: [Onde estamos? Descreva os elementos principais (prédios, natureza, mobília) e as cores predominantes.]
+    - Iluminação e Atmosfera: [Qual é a fonte de luz? Como as sombras se comportam? Qual é a sensação geral do lugar (opressiva, pacífica, misteriosa)?]
+    - Sons e Cheiros: [Quais sons preenchem o ambiente (vento, máquinas, silêncio)? Existem cheiros distintos (maresia, fumaça, umidade)?]
+    - Clima e Sensações: [Está frio, quente, úmido? O ar está parado ou há vento? O que alguém sentiria na pele neste lugar?]
     """
     description = generate_ia_content(instruction)
     return jsonify({'description': description})
@@ -326,75 +342,75 @@ def montar_prompt():
     characters = data.get('characters', [])
     scenario = data.get('scenario', {})
     details = data.get('details', {})
-    character_prompts = [f"- Technical Sheet for '{c.get('name')}': {c.get('description')}" for c in characters]
-    dialogue_prompts = []
+    language = details.get('language', 'English') 
+    
+    character_sheets = "\n".join([f"- Technical Sheet for '{c.get('name')}':\n{c.get('description')}" for c in characters])
+    
+    dialogue_lines_pt_br = []
     if details.get('dialogues'):
       for d in details.get('dialogues', []):
           char_name = next((c['name'] for c in characters if c['id'] == d.get('charId')), "Character")
-          dialogue_prompts.append(f"- {char_name}: \"{d.get('text')}\"")
+          dialogue_lines_pt_br.append(f"- {char_name}: \"{d.get('text')}\"")
 
     final_assembly_instruction = f"""
-    You are an expert prompt engineer for a generative video AI. Your task is to transform the raw data below into a final, highly structured, and clean video prompt. Follow the model and rules strictly.
-    **RULES:**
-    1.  **Output Language:** All structural text, headers, and descriptions MUST be in ENGLISH.
-    2.  **Dialogue Language:** The character dialogues provided in 'Dialogue Sequence' MUST remain in BRAZILIAN PORTUGUESE (PT-BR) exactly as given.
-    3.  **No Markdown:** Do NOT use any markdown formatting like '**' in the output. All headers should be plain text.
-    4.  **Structured Lists:** For 'Scene Setup' and 'Character', do NOT write long paragraphs. Instead, extract key information and present it as a structured list with clear labels (e.g., 'Location:', 'Exterior:', 'Age:', 'Face:'). Be concise.
-    5.  **Scene Action:** For each scene, create a short, descriptive 'Action:' line summarizing what is happening.
+    You are an expert prompt engineer for a generative video AI. Your task is to transform the raw data below into a final, structured video prompt.
+
+    **PRIMARY RULES:**
+    1.  **Output Language:** The entire final prompt structure, titles, and descriptions MUST be in ENGLISH.
+    2.  **Translate Dialogue:** The dialogues are provided in Brazilian Portuguese. You MUST translate them to **{language}**. The final output must contain only the translated dialogue.
+    3.  **No Markdown:** Do NOT use any markdown formatting like '**' or '##' in the final output.
+    4.  **Scene Structuring:** You have 8 seconds total. Based on the dialogues, structure them into one or a maximum of two scenes (🎞️ Scene 01, 🎞️ Scene 02). Group dialogues logically and create a short, descriptive 'Action:' line for each scene.
+    5.  **Attribute Dialogue:** In the 'Dialogue' line for each scene, you MUST attribute each piece of dialogue to the character speaking. Use formats like "CharacterName says, '[Dialogue]'" or "CharacterName responds, '[Dialogue]'".
+
     **RAW DATA TO TRANSFORM:**
     - Action Context: "{details.get('action_context')}"
-    - Scene Technical Sheet: "{scenario.get('description')}"
+    - Visual Style: "{details.get('visual_style')}"
+    - Camera Style: "{details.get('camera_style')}"
+    - Scene Technical Sheet: {scenario.get('description')}
     - Character Technical Sheets:
-      {", ".join(character_prompts)}
-    - Dialogue Sequence (KEEP IN PORTUGUESE):
-      {", ".join(dialogue_prompts)}
-    - General Technical Details:
-      - Visual Style: "{details.get('visual_style')}"
-      - Camera Style: "{details.get('camera_style')}"
-      - Estimated Total Duration: 8 seconds
-      - Aspect Ratio: 16:9
-    **REQUIRED OUTPUT MODEL (Follow this structure precisely):**
+      {character_sheets}
+    - Dialogue Sequence (provided in PT-BR, to be translated to {language}):
+      {"\n".join(dialogue_lines_pt_br) if dialogue_lines_pt_br else "No dialogue provided."}
+
+    **REQUIRED OUTPUT MODEL (Fill all details based on RAW DATA):**
     Prompt Title:
-    [Generate a 1-3 word title here]
+    [Generate a 1-3 word title in ENGLISH here based on the action context]
+
     Scene Setup:
-    - Location: [Describe location]
-    - Exterior: [Describe exterior details]
-    - Interior: [Describe interior details]
-    - Key Props: [List key props]
-    - Aesthetic: [Describe the overall aesthetic]
-    Character – [Character Name]:
-    - Age: [Character's age]
-    - Ethnicity: [Character's ethnicity]
-    - Face: [Describe facial features]
-    - Eyes: [Describe eyes]
-    - Hair: [Describe hair]
-    - Physique: [Describe physique]
-    - Clothing: [Describe clothing]
-    🎞️ Scene 01 (0.0s – 4.0s):
-    - Action: [Describe the action for the first scene.]
-    - 🗣️ Dialogue (PT-BR): "[First dialogue from the sequence. IN PORTUGUESE.]"
-    - Camera: [Describe camera movement and shot type.]
-    - Light: [Describe the scene's lighting.]
+    [Based on the Scene Technical Sheet, create a list of key environmental details like Location, Lighting, Atmosphere, and Key Elements. Be descriptive.]
+
+    Character - [Character Name 1]:
+    [Based on the Character Technical Sheet, create a list of key visual details like General Appearance, Face, Clothing, and Posture.]
+    
+    (Repeat for each character)
+
+    --- SCENE BREAKDOWN ---
+
+    🎞️ Scene 01 (0.0s – [end time]s):
+    - Action: [AI-generated description of the action for this scene, based on context and dialogue.]
+    - 🗣️ Dialogue ({language}): [Combine the translated dialogues for this scene, attributing each one clearly. FOR EXAMPLE: 'Character 1 says, "Hello there.", Character 2 responds, "General Kenobi."']
+    - Camera: [{details.get('camera_style')}]
+    - Light: [Describe the scene's lighting, based on the setup.]
     - Audio: [Describe the background audio.]
-    - Focus: [Describe the camera's focus.]
     - Mood: [Describe the mood of the scene.]
-    🎞️ Scene 02 (4.0s – 8.0s):
-    - Action: [Describe the action for the second scene.]
-    - 🗣️ Dialogue (PT-BR): "[Second dialogue from the sequence, or '(No dialogue)' if none.]"
+
+    (If you decide a second scene is necessary, create it here. Otherwise, omit this block.)
+    🎞️ Scene 02 ([start time]s – 8.0s):
+    - Action: [AI-generated description of the action for this scene.]
+    - 🗣️ Dialogue ({language}): [Translated dialogue(s) for scene 2, attributed to the speaker. If none, write '(No dialogue)'.]
     - Camera: [Describe camera movement and shot type.]
     - Light: [Describe the scene's lighting.]
     - Audio: [Describe the background audio.]
-    - Focus: [Describe the camera's focus.]
     - Atmosphere: [Describe the atmosphere of the scene.]
-    (Continue with more scenes if there are more dialogues)
+
     ⚙️ Final AI Instructions:
     - Duration: 8 seconds
     - Aspect Ratio: 16:9
-    - Dialogue: Brazilian Portuguese (PT-BR), lip sync enabled
-    - Focus: Always on the character
-    - Visual Style: [Use the Visual Style from the Technical Details]
-    - No subtitles, no watermarks
-    - Audio: Clean, continuous beat, no additional voiceover
+    - Dialogue Language: {language}, lip sync enabled.
+    - Focus: Always on the active character.
+    - Visual Style: {details.get('visual_style')}
+    - Output must not contain watermarks or subtitles.
+    - Audio: Clean, continuous background audio, no additional voiceover.
     """
     final_prompt = generate_ia_content(final_assembly_instruction)
     return jsonify({'prompt': final_prompt})
@@ -415,4 +431,4 @@ def reset_database():
         return f"Ocorreu um erro durante o reset: {e}", 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)
