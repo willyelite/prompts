@@ -26,6 +26,9 @@ db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+login_manager.login_message = "Por favor, faça login para acessar esta página."
+login_manager.login_message_category = "info"
+
 
 # --- MODELOS E FORMULÁRIOS ---
 @login_manager.user_loader
@@ -36,6 +39,21 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(60), nullable=False)
+
+class SavedCharacter(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    concept = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user = db.relationship('User', backref=db.backref('saved_characters', lazy=True))
+
+class SavedScenario(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    concept = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user = db.relationship('User', backref=db.backref('saved_scenarios', lazy=True))
 
 class RegistrationForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
@@ -63,7 +81,14 @@ def login():
         user = User.query.filter_by(email=form.email.data).first()
         if user and bcrypt.check_password_hash(user.password_hash, form.password.data):
             login_user(user, remember=True)
-            return redirect(url_for('oficina'))
+            
+            redirect_target = request.form.get('redirect_choice')
+            if redirect_target == 'biblioteca':
+                return redirect(url_for('biblioteca'))
+            else:
+                return redirect(url_for('oficina'))
+        else:
+            flash('Login falhou. Verifique o email e a senha.', 'danger')
     return render_template('login.html', form=form)
 
 @app.route("/register", methods=['GET', 'POST'])
@@ -75,6 +100,7 @@ def register():
         user = User(email=form.email.data, password_hash=hashed_password)
         db.session.add(user)
         db.session.commit()
+        flash('Sua conta foi criada! Agora você pode fazer login.', 'success')
         return redirect(url_for('login'))
     return render_template('register.html', form=form)
 
@@ -104,17 +130,19 @@ def oficina():
         session['characters'] = json.loads(request.form.get('scene_characters_data', '[]'))
         session['scenario'] = json.loads(request.form.get('scene_scenario_data', '{}'))
         if not session.get('characters'):
+            flash('Adicione pelo menos um personagem para continuar.', 'danger')
             return redirect(url_for('oficina'))
         return redirect(url_for('detalhes'))
+    
     return render_template('oficina.html', 
                            saved_characters=session.get('characters', []), 
                            saved_scenario=session.get('scenario', {}))
 
-# <<< ROTA CORRIGIDA PARA RENDERIZAR O TEMPLATE >>>
 @app.route('/detalhes', methods=['GET', 'POST'])
 @login_required
 def detalhes():
     if 'characters' not in session or not session.get('characters'):
+        flash('Você precisa definir personagens antes de continuar. Comece pela oficina.', 'info')
         return redirect(url_for('oficina'))
     if request.method == 'POST':
         session['details'] = {key: request.form.get(key) for key in request.form}
@@ -122,16 +150,138 @@ def detalhes():
         return redirect(url_for('resumo'))
     return render_template('detalhes.html')
 
-# <<< ROTA CORRIGIDA PARA RENDERIZAR O TEMPLATE >>>
 @app.route('/resumo')
 @login_required
 def resumo():
     if 'details' not in session:
+        flash('Você precisa passar pelos detalhes antes de ver o resumo.', 'info')
         return redirect(url_for('detalhes'))
     return render_template('resumo.html')
 
-# --- MICRO-ROTAS E FUNÇÕES FINAIS ---
+# --- ROTAS DA BIBLIOTECA ---
+
+@app.route('/biblioteca')
+@login_required
+def biblioteca():
+    session.clear()
+    user_characters = SavedCharacter.query.filter_by(user_id=current_user.id).order_by(SavedCharacter.name).all()
+    user_scenarios = SavedScenario.query.filter_by(user_id=current_user.id).order_by(SavedScenario.concept).all()
+    return render_template('biblioteca.html', 
+                           characters=user_characters, 
+                           scenarios=user_scenarios)
+
+@app.route('/biblioteca/carregar', methods=['POST'])
+@login_required
+def carregar_da_biblioteca():
+    session.clear()
+    
+    char_ids = request.form.getlist('character_ids')
+    scen_id = request.form.get('scenario_id')
+    
+    loaded_characters = []
+    if char_ids:
+        characters_from_db = db.session.query(SavedCharacter).filter(SavedCharacter.id.in_(char_ids)).all()
+        for i, char_db in enumerate(characters_from_db):
+            if char_db.user_id == current_user.id:
+                loaded_characters.append({
+                    'id': i + 1,
+                    'name': char_db.name,
+                    'concept': char_db.concept,
+                    'description': char_db.description
+                })
+    
+    loaded_scenario = {}
+    if scen_id:
+        scenario_from_db = db.session.get(SavedScenario, int(scen_id))
+        if scenario_from_db and scenario_from_db.user_id == current_user.id:
+            loaded_scenario = {
+                'concept': scenario_from_db.concept,
+                'description': scenario_from_db.description
+            }
+
+    if not loaded_characters:
+        flash('Selecione pelo menos um personagem para carregar.', 'danger')
+        return redirect(url_for('biblioteca'))
+
+    session['characters'] = loaded_characters
+    session['scenario'] = loaded_scenario
+    
+    return redirect(url_for('detalhes'))
+
+
+@app.route('/save_components', methods=['POST'])
+@login_required
+def save_components():
+    characters = session.get('characters', [])
+    scenario = session.get('scenario', {})
+
+    if not characters and not scenario.get('concept'):
+        return jsonify({'success': False, 'message': 'Não há nada na sessão atual para salvar.'}), 400
+
+    try:
+        saved_count = 0
+        for char_data in characters:
+            exists = SavedCharacter.query.filter_by(user_id=current_user.id, name=char_data['name']).first()
+            if not exists:
+                new_char = SavedCharacter(
+                    name=char_data['name'],
+                    concept=char_data['concept'],
+                    description=char_data['description'],
+                    user_id=current_user.id
+                )
+                db.session.add(new_char)
+                saved_count += 1
+
+        if scenario.get('concept'):
+            exists = SavedScenario.query.filter_by(user_id=current_user.id, concept=scenario['concept']).first()
+            if not exists:
+                new_scen = SavedScenario(
+                    concept=scenario['concept'],
+                    description=scenario['description'],
+                    user_id=current_user.id
+                )
+                db.session.add(new_scen)
+                saved_count += 1
+        
+        if saved_count > 0:
+            db.session.commit()
+            return jsonify({'success': True, 'message': f'{saved_count} novo(s) componente(s) salvo(s) na sua biblioteca!'})
+        else:
+            return jsonify({'success': True, 'message': 'Todos os componentes desta sessão já estavam salvos.'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro no servidor: {e}'}), 500
+
+@app.route('/delete_asset/<string:asset_type>/<int:asset_id>', methods=['POST'])
+@login_required
+def delete_asset(asset_type, asset_id):
+    try:
+        if asset_type == 'character':
+            asset = db.session.get(SavedCharacter, asset_id)
+        elif asset_type == 'scenario':
+            asset = db.session.get(SavedScenario, asset_id)
+        else:
+            return jsonify({'success': False, 'message': 'Tipo de ativo inválido.'}), 400
+
+        if not asset:
+            return jsonify({'success': False, 'message': 'Ativo não encontrado.'}), 404
+        
+        if asset.user_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Não autorizado.'}), 403
+
+        db.session.delete(asset)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Ativo apagado com sucesso.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro no servidor: {e}'}), 500
+
+
+# --- MICRO-ROTAS E FUNÇÕES FINAIS (IA) ---
 def generate_ia_content(instruction):
+    if not api_key:
+        return "Erro: A chave da API do Gemini não foi configurada no servidor."
     model = genai.GenerativeModel('gemini-1.5-flash')
     try:
         response = model.generate_content(instruction)
@@ -170,15 +320,13 @@ def montar_prompt():
     scenario = data.get('scenario', {})
     details = data.get('details', {})
     
-    # Coleta de dados (sem alterações aqui)
     character_prompts = [f"- Technical Sheet for '{c.get('name')}': {c.get('description')}" for c in characters]
     
     dialogue_prompts = []
     for d in details.get('dialogues', []):
-        char_name = next((c['name'] for c in characters if c['id'] == d['charId']), "Character")
+        char_name = next((c['name'] for c in characters if c['id'] == d.get('charId')), "Character")
         dialogue_prompts.append(f"- {char_name}: \"{d.get('text')}\"")
 
-    # <<< NOVA INSTRUÇÃO TOTALMENTE EM INGLÊS E COM AS NOVAS REGRAS >>>
     final_assembly_instruction = f"""
     You are an expert screenwriter and art director for generative AI. Your task is to transform the raw data below into a final, highly structured, and detailed video prompt. Follow the model and rules strictly.
 
@@ -247,6 +395,27 @@ def montar_prompt():
     
     final_prompt = generate_ia_content(final_assembly_instruction)
     return jsonify({'prompt': final_prompt})
+
+# --- ROTA DE ADMINISTRAÇÃO PARA RESETAR O BANCO DE DADOS ---
+@app.route('/reset-database')
+def reset_database():
+    # ATENÇÃO: Esta rota apaga TODOS os dados. Use com cuidado.
+    # A "senha" na URL é uma medida de segurança mínima.
+    secret_key = request.args.get('secret')
+    if secret_key != 'startfresh': # Você pode mudar 'startfresh' para qualquer senha que quiser
+        return "Acesso não autorizado.", 403
+
+    try:
+        flash('Iniciando reset do banco de dados...', 'info')
+        # Apaga todas as tabelas
+        db.drop_all()
+        # Cria todas as tabelas novamente com base nos modelos
+        db.create_all()
+        flash('Banco de dados zerado e recriado com sucesso! Por favor, crie uma nova conta.', 'success')
+        return redirect(url_for('register'))
+    except Exception as e:
+        return f"Ocorreu um erro durante o reset: {e}", 500
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

@@ -1,0 +1,220 @@
+{% extends "layout.html" %}
+
+{% block title %}Sua Biblioteca Criativa{% endblock %}
+
+{% block head_styles %}
+<style>
+    h1 { text-align: center; color: var(--text-color); font-weight: 700; margin-bottom: 0.5rem; }
+    h1 span { color: var(--primary-color); }
+    h2 { margin-top: 2.5rem; color: var(--primary-color); opacity: 0.9; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1.5rem; font-size: 1.5rem; }
+    
+    .library-header {
+        text-align: center;
+        margin-bottom: 2.5rem;
+    }
+    .library-header p {
+        font-size: 1.1rem;
+        color: #aeb9c5;
+        margin-top: 0;
+    }
+    .start-new-btn {
+        display: inline-block;
+        text-decoration: none;
+        padding: 12px 25px;
+        background-color: var(--surface-color);
+        color: var(--primary-color);
+        border: 1px solid var(--primary-color);
+        border-radius: 8px;
+        font-weight: 700;
+        margin-top: 1rem;
+        transition: all 0.2s ease;
+    }
+    .start-new-btn:hover {
+        background-color: var(--primary-color);
+        color: var(--button-text-dark);
+    }
+
+    .asset-list { 
+        display: grid; 
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+        gap: 1.5rem; 
+    }
+    .asset-card { 
+        background-color: var(--surface-color); 
+        border-radius: 8px; 
+        border: 1px solid var(--border-color);
+        padding: 1.25rem; 
+        display: flex; 
+        flex-direction: column; 
+        justify-content: space-between; 
+        transition: border-color 0.2s ease;
+    }
+    .asset-card:has(input:checked) {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 15px rgba(255, 193, 7, 0.2);
+    }
+    .asset-card-content h3 { 
+        border: none; 
+        margin: 0 0 0.5rem 0; 
+        font-size: 1.2rem; 
+        color: var(--text-color); 
+    }
+    .asset-card-content p { 
+        font-size: 0.9rem; 
+        color: #aeb9c5; 
+        margin: 0;
+        overflow: hidden; 
+        text-overflow: ellipsis; 
+        display: -webkit-box; 
+        -webkit-line-clamp: 2; 
+        -webkit-box-orient: vertical; 
+    }
+    .asset-selection {
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+    }
+    .asset-selection input {
+        margin-right: 0.75rem;
+        width: 18px;
+        height: 18px;
+    }
+    .asset-actions { 
+        display: flex; 
+        gap: 0.5rem; 
+        margin-top: 1.5rem; 
+    }
+    .delete-btn { 
+        width: 100%;
+        text-align: center; 
+        text-decoration: none; 
+        font-size: 0.9rem; 
+        padding: 8px 12px; 
+        border: 1px solid var(--danger-color);
+        background-color: transparent;
+        color: var(--danger-color);
+        border-radius: 6px; 
+        font-weight: 700; 
+        cursor: pointer; 
+        transition: all 0.2s ease;
+    }
+    .delete-btn:hover {
+        background-color: var(--danger-color);
+        color: white;
+    }
+
+    .load-button-container {
+        position: sticky;
+        bottom: 0;
+        background: linear-gradient(180deg, rgba(13, 27, 42, 0) 0%, rgba(13, 27, 42, 1) 40%);
+        padding: 2rem 0 1rem 0;
+        margin-top: 3rem;
+    }
+    .main-button {
+        width: 100%;
+        padding: 15px;
+        background-color: var(--success-color);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1.2rem;
+        font-weight: 700;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="library-header">
+    <h1>Sua Biblioteca <span>Criativa</span></h1>
+    <p>Selecione os componentes que deseja usar e continue sua criação.</p>
+    <a href="{{ url_for('home') }}" class="start-new-btn">Ou Inicie uma Nova Criação do Zero</a>
+</div>
+
+<form id="load-form" method="POST" action="{{ url_for('carregar_da_biblioteca') }}">
+
+    <!-- Seção de Personagens Salvos -->
+    <h2>Personagens Salvos (Selecione um ou mais)</h2>
+    <div class="asset-list">
+        {% for char in characters %}
+        <div class="asset-card" id="char-card-{{ char.id }}">
+            <label class="asset-selection" for="char-check-{{ char.id }}">
+                <input type="checkbox" name="character_ids" value="{{ char.id }}" id="char-check-{{ char.id }}">
+                <div class="asset-card-content">
+                    <h3>{{ char.name }}</h3>
+                    <p title="{{ char.concept }}">{{ char.concept }}</p>
+                </div>
+            </label>
+            <div class="asset-actions">
+                <button type="button" onclick="deleteAsset('character', {{ char.id }})" class="delete-btn">Apagar</button>
+            </div>
+        </div>
+        {% else %}
+        <p>Você ainda não salvou nenhum personagem. Crie um na oficina e salve-o na tela de resumo.</p>
+        {% endfor %}
+    </div>
+
+    <!-- Seção de Cenários Salvos -->
+    <h2>Cenário (Selecione um)</h2>
+    <div class="asset-list">
+        {% for scen in scenarios %}
+        <div class="asset-card" id="scen-card-{{ scen.id }}">
+            <label class="asset-selection" for="scen-radio-{{ scen.id }}">
+                <input type="radio" name="scenario_id" value="{{ scen.id }}" id="scen-radio-{{ scen.id }}">
+                <div class="asset-card-content">
+                    <h3>Cenário</h3>
+                    <p title="{{ scen.concept }}">{{ scen.concept }}</p>
+                </div>
+            </label>
+            <div class="asset-actions">
+                <button type="button" onclick="deleteAsset('scenario', {{ scen.id }})" class="delete-btn">Apagar</button>
+            </div>
+        </div>
+        {% else %}
+        <p>Você ainda não salvou nenhum cenário. Crie um na oficina e salve-o na tela de resumo.</p>
+        {% endfor %}
+    </div>
+
+    <div class="load-button-container">
+        <button type="submit" class="main-button">Carregar Selecionados e Continuar →</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function deleteAsset(assetType, assetId) {
+    // Usando uma caixa de diálogo de confirmação mais robusta.
+    const confirmation = confirm(`Tem certeza que deseja apagar este ${assetType === 'character' ? 'personagem' : 'cenário'}? Esta ação não pode ser desfeita.`);
+    
+    if (!confirmation) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/delete_asset/${assetType}/${assetId}`, { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await response.json();
+        if (data.success) {
+            const cardId = assetType === 'character' ? `char-card-${assetId}` : `scen-card-${assetId}`;
+            const cardElement = document.getElementById(cardId);
+            if (cardElement) {
+                cardElement.style.transition = 'opacity 0.5s';
+                cardElement.style.opacity = '0';
+                setTimeout(() => cardElement.remove(), 500);
+            }
+            // Opcional: pode-se adicionar uma mensagem flash visual aqui em vez de um alert.
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (error) {
+        alert('Erro ao apagar o ativo: ' + error.message);
+    }
+}
+</script>
+{% endblock %}

@@ -14,13 +14,15 @@
     .form-group { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; }
     label { font-weight: 500; color: #aeb9c5; }
     textarea { background-color: var(--surface-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-size: 1rem; width: 100%; box-sizing: border-box; resize: vertical; min-height: 120px; }
-    .main-button { width: 100%; margin-top: 1rem; padding: 15px; background-color: var(--success-color); color: white; border: none; border-radius: 8px; font-size: 1.2rem; font-weight: 700; cursor: pointer; }
+    .main-button { width: 100%; margin-top: 1rem; padding: 15px; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: background-color 0.2s ease; }
     .main-button:disabled { background-color: #555; cursor: not-allowed; }
-    .button-group { display: flex; gap: 1rem; margin-top: 2rem; }
-    .back-button { background-color: var(--border-color); color: var(--text-color); flex-grow: 0.5; }
-    .next-button { flex-grow: 2; }
+    .button-group { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 2rem; }
+    .button-group .main-button { flex: 1 1 auto; } /* Permite que os botões se ajustem */
+    .back-button { background-color: var(--border-color); color: var(--text-color); }
+    .save-button { background-color: var(--info-color); color: white; }
+    .assemble-button { background-color: var(--success-color); color: white; }
     .result-wrapper { margin-top: 2rem; background-color: #101820; border-radius: 8px; padding: 1.5rem; position: relative; display: none; }
-    #final-prompt-output { white-space: pre-wrap; line-height: 1.7; }
+    #final-prompt-output { white-space: pre-wrap; line-height: 1.7; font-family: monospace; }
     .copy-button { position: absolute; top: 1rem; right: 1rem; background-color: var(--primary-color); color: var(--button-text-dark); border: none; border-radius: 5px; padding: 8px 12px; cursor: pointer; font-weight: 500; }
 </style>
 {% endblock %}
@@ -47,15 +49,16 @@
         </div>
         {% for char in session.get('characters', []) %}
         <div class="form-group">
-            <label for="char-edit-{{ char.id }}">Ficha Técnica do {{ char.name }}</label>
+            <label for="char-edit-{{ char.id }}">Ficha Técnica de {{ char.name }}</label>
             <textarea id="char-edit-{{ char.id }}">{{ char.description }}</textarea>
         </div>
         {% endfor %}
     </div>
     
     <div class="button-group">
-        <a href="{{ url_for('detalhes') }}" class="main-button back-button" style="text-align: center; text-decoration: none;">&larr; Voltar para Detalhes</a>
-        <button id="assemble-btn" class="main-button" onclick="assemblePrompt()">Montar Prompt Final</button>
+        <a href="{{ url_for('detalhes') }}" class="main-button back-button" style="text-align: center; text-decoration: none;">&larr; Voltar</a>
+        <button id="save-btn" class="main-button save-button" onclick="saveComponents()">Salvar Componentes na Biblioteca</button>
+        <button id="assemble-btn" class="main-button assemble-button" onclick="assemblePrompt()">Montar Prompt Final</button>
     </div>
 
     <div class="result-wrapper" id="result-wrapper">
@@ -67,6 +70,28 @@
 
 {% block scripts %}
 <script>
+    // Função para salvar os componentes na biblioteca
+    async function saveComponents() {
+        const saveBtn = document.getElementById('save-btn');
+        saveBtn.disabled = true;
+        saveBtn.innerText = 'Salvando...';
+
+        try {
+            const response = await fetch("{{ url_for('save_components') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await response.json();
+            alert(data.message); // Exibe a mensagem de sucesso ou aviso do servidor
+        } catch (error) {
+            alert(`Erro ao salvar: ${error.message}`);
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.innerText = 'Salvar Componentes na Biblioteca';
+        }
+    }
+
+    // Função para montar o prompt final (já existente, com pequenas melhorias)
     async function assemblePrompt() {
         const assembleBtn = document.getElementById('assemble-btn');
         assembleBtn.disabled = true;
@@ -74,7 +99,11 @@
 
         const editedScenarioDesc = document.getElementById('scenario-edit').value;
         const editedCharacters = [];
-        const originalCharacters = {{ session.get('characters', [])|tojson }};
+        
+        // --- CORREÇÃO APLICADA AQUI ---
+        // Método mais seguro para carregar dados do Jinja para o JavaScript
+        const originalCharacters = JSON.parse('{{ session.get("characters", [])|tojson|safe }}');
+        
         originalCharacters.forEach(char => {
             editedCharacters.push({
                 id: char.id,
@@ -86,7 +115,8 @@
         const payload = {
             characters: editedCharacters,
             scenario: { description: editedScenarioDesc },
-            details: {{ session.get('details', {})|tojson }}
+            // --- CORREÇÃO APLICADA AQUI ---
+            details: JSON.parse('{{ session.get("details", {})|tojson|safe }}')
         };
 
         try {
@@ -95,12 +125,15 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            if (!response.ok) throw new Error('Falha na montagem do prompt.');
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({'error': 'Erro desconhecido.'}));
+                throw new Error(errorData.error || 'Falha na montagem do prompt.');
+            }
             const data = await response.json();
             
-            // <<< CORREÇÃO DA CHAVE DO JAVASCRIPT >>>
             document.getElementById('final-prompt-output').innerText = data.prompt;
             document.getElementById('result-wrapper').style.display = 'block';
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 
         } catch (error) {
             alert(`Erro: ${error.message}`);
@@ -110,12 +143,13 @@
         }
     }
 
+    // Função para copiar o prompt (já existente)
     function copyPrompt() {
         const textToCopy = document.getElementById('final-prompt-output').innerText;
         navigator.clipboard.writeText(textToCopy).then(() => {
             alert('Prompt copiado com sucesso!');
         }, () => {
-            alert('Falha ao copiar.');
+            alert('Falha ao copiar para a área de transferência.');
         });
     }
 </script>

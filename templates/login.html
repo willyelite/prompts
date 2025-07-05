@@ -5,6 +5,112 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Gerador de Prompts</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    
+    <style>
+        /* Estilos que você já pode ter em style.css */
+        :root {
+            --bg-color: #0D1B2A; --surface-color: #1B263B; --primary-color: #FFC107;
+            --text-color: #E0E1DD; --border-color: #415A77; --button-text-dark: #121212;
+        }
+        body { 
+            font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-color); 
+            display: flex; justify-content: center; align-items: center; min-height: 100vh;
+            margin: 0; padding: 1rem;
+        }
+        .auth-container {
+            width: 100%;
+            max-width: 400px;
+            padding: 2.5rem;
+            background-color: var(--surface-color);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+        .auth-container h2 {
+            text-align: center;
+            color: var(--text-color);
+            font-weight: 700;
+            margin-bottom: 2rem;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #aeb9c5;
+        }
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-color);
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        .main-button {
+            width: 100%;
+            margin-top: 1rem;
+            padding: 15px;
+            background-color: var(--primary-color);
+            color: var(--button-text-dark);
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .auth-link {
+            text-align: center;
+            margin-top: 1.5rem;
+        }
+        .auth-link a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        /* --- CSS PARA O NOVO INTERRUPTOR --- */
+        .switch-field {
+            display: flex;
+            overflow: hidden;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .switch-field input {
+            position: absolute !important;
+            clip: rect(0, 0, 0, 0);
+            height: 1px;
+            width: 1px;
+            border: 0;
+            overflow: hidden;
+        }
+        .switch-field label {
+            background-color: transparent;
+            color: #aeb9c5;
+            font-size: 1rem;
+            line-height: 1;
+            text-align: center;
+            padding: 12px 16px;
+            margin-right: -1px;
+            border-right: 1px solid var(--border-color);
+            transition: all 0.2s ease-in-out;
+            width: 50%;
+            cursor: pointer;
+            margin-bottom: 0;
+        }
+        .switch-field label:last-of-type {
+            border-right: 0;
+        }
+        .switch-field input:checked + label {
+            background-color: var(--primary-color);
+            color: var(--button-text-dark);
+            font-weight: 600;
+            box-shadow: none;
+        }
+    </style>
 </head>
 <body>
     <div class="auth-container">
@@ -30,6 +136,17 @@
                 {{ form.password.label(class="form-label") }}
                 {{ form.password(class="form-control") }}
             </div>
+            
+            <div class="form-group">
+                <label class="form-label">Após o login, ir para:</label>
+                <div class="switch-field">
+                    <input type="radio" id="radio-novo" name="redirect_choice" value="oficina" checked/>
+                    <label for="radio-novo">Nova Criação</label>
+                    <input type="radio" id="radio-biblioteca" name="redirect_choice" value="biblioteca" />
+                    <label for="radio-biblioteca">Biblioteca</label>
+                </div>
+            </div>
+
             <div class="form-group">
                 {{ form.submit(class="main-button") }}
             </div>
