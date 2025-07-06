@@ -13,7 +13,6 @@
     .start-new-btn { display: inline-block; text-decoration: none; padding: 12px 25px; background-color: var(--surface-color); color: var(--primary-color); border: 1px solid var(--primary-color); border-radius: 8px; font-weight: 700; margin-top: 1rem; transition: all 0.2s ease; }
     .start-new-btn:hover { background-color: var(--primary-color); color: var(--button-text-dark); }
 
-    /* ALTERAÇÃO #1: Diminuí o tamanho mínimo dos cards para 210px para ficarem menores. */
     .asset-list { 
         display: grid; 
         grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); 
@@ -23,7 +22,6 @@
         background-color: var(--surface-color); 
         border-radius: 8px; 
         border: 1px solid var(--border-color);
-        /* ALTERAÇÃO #2: Diminuí o padding para o card ficar mais compacto. */
         padding: 0.9rem; 
         display: flex; 
         flex-direction: column; 
@@ -37,7 +35,6 @@
     .asset-card-content h3 { 
         border: none; 
         margin: 0 0 0.5rem 0; 
-        /* ALTERAÇÃO #3: Diminuí a fonte do título para se ajustar ao novo tamanho. */
         font-size: 1.1rem; 
         color: var(--text-color); 
     }
@@ -79,7 +76,7 @@
                 <input type="checkbox" name="character_ids" value="{{ char.id }}" id="char-check-{{ char.id }}">
                 <div class="asset-card-content">
                     <h3>{{ char.name }}</h3>
-                    <p title="{{ char.concept }}">{{ char.concept }}</p>
+                    <p title="{{ char.description }}">{{ char.description }}</p>
                 </div>
             </label>
             <div class="asset-actions">
@@ -98,7 +95,8 @@
             <label class="asset-selection" for="scen-radio-{{ scen.id }}">
                 <input type="radio" name="scenario_id" value="{{ scen.id }}" id="scen-radio-{{ scen.id }}">
                 <div class="asset-card-content">
-                    <h3>{{ scen.concept }}</h3>
+                    <!-- MUDANÇA AQUI: Trocado scen.concept por scen.name para exibir o nome correto -->
+                    <h3>{{ scen.name }}</h3>
                     <p title="{{ scen.description }}">{{ scen.description }}</p>
                 </div>
             </label>
@@ -120,7 +118,8 @@
 {% block scripts %}
 <script>
 async function deleteAsset(assetType, assetId) {
-    const confirmation = confirm(`Tem certeza que deseja apagar este ${assetType === 'character' ? 'personagem' : 'cenário'}? Esta ação não pode ser desfeita.`);
+    // Usando um modal customizado em vez de confirm() seria ideal no futuro, mas por agora mantemos a simplicidade.
+    const confirmation = window.confirm(`Tem certeza que deseja apagar este ${assetType === 'character' ? 'personagem' : 'cenário'}? Esta ação não pode ser desfeita.`);
     if (!confirmation) { return; }
     try {
         const response = await fetch(`/delete_asset/${assetType}/${assetId}`, { 

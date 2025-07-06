@@ -33,7 +33,8 @@
 
     <div class="summary-box">
         <p><strong>Personagens Definidos:</strong> {{ session.get('characters', [])|map(attribute='name')|join(', ') }}</p>
-        <p style="margin-top: 0.5rem;"><strong>Cenário Definido:</strong> {{ session.get('scenario', {}).get('concept', 'Nenhum') }}</p>
+        <!-- MUDANÇA AQUI: Trocado .get('concept') por .get('name') -->
+        <p style="margin-top: 0.5rem;"><strong>Cenário Definido:</strong> {{ session.get('scenario', {}).get('name', 'Nenhum') }}</p>
     </div>
 
     <form id="details-form" method="POST" action="{{ url_for('detalhes') }}">

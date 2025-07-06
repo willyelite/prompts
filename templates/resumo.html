@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}Etapa 3: Resumo e Edição Final{% endblock %}
+{% block title %}Etapa 3: Resumo e Geração Final{% endblock %}
 
 {% block head_styles %}
 <style>
@@ -11,56 +11,82 @@
     .summary-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
     @media (min-width: 768px) { .summary-grid { grid-template-columns: 1fr 1fr; } }
     .summary-item strong { color: var(--primary-color); display: block; margin-bottom: 0.25rem;}
-    .form-group { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; }
-    label { font-weight: 500; color: #aeb9c5; }
-    textarea { background-color: var(--surface-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-size: 1rem; width: 100%; box-sizing: border-box; resize: vertical; min-height: 120px; }
-    /* Adicionado para feedback visual do campo readonly */
-    textarea[readonly] { background-color: #101820; color: #aeb9c5; cursor: not-allowed; }
+    .dialogue-item { margin-top: 0.5rem; }
+    .dialogue-item strong { color: var(--primary-color); }
     .main-button { width: 100%; margin-top: 1rem; padding: 15px; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: background-color 0.2s ease; }
     .main-button:disabled { background-color: #555; cursor: not-allowed; }
     .button-group { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 2rem; }
     .button-group .main-button { flex: 1 1 auto; }
     .back-button { background-color: var(--border-color); color: var(--text-color); }
-    .save-button { background-color: var(--info-color); color: white; }
     .assemble-button { background-color: var(--success-color); color: white; }
     .result-wrapper { margin-top: 2rem; background-color: #101820; border-radius: 8px; padding: 1.5rem; position: relative; display: none; }
     #final-prompt-output { white-space: pre-wrap; line-height: 1.7; font-family: monospace; }
     .copy-button { position: absolute; top: 1rem; right: 1rem; background-color: var(--primary-color); color: var(--button-text-dark); border: none; border-radius: 5px; padding: 8px 12px; cursor: pointer; font-weight: 500; }
+    .save-component-btn {
+        background-color: var(--info-color);
+        color: white;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+    .save-component-btn:hover {
+        background-color: #0aa2c0; /* Cor um pouco mais clara para o hover */
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-    <h1>Resumo e <span>Edição Final</span></h1>
-    <p style="text-align: center; margin-top: -1.5rem; color: #aeb9c5;">Etapa 3 de 3: Revise e monte o prompt final.</p>
+    <h1>Resumo e <span>Geração Final</span></h1>
+    <p style="text-align: center; margin-top: -1.5rem; color: #aeb9c5;">Etapa 3 de 3: Revise os componentes e gere o prompt final.</p>
 
+    <!-- MUDANÇA: Seção de resumo agora é um único bloco de conferência -->
     <div class="summary-section">
-        <h2>Ajustes Finais Selecionados</h2>
+        <h2>Resumo para Conferência</h2>
         <div class="summary-grid">
-            <div class="summary-item"><strong>Contexto da Ação:</strong> {{ session.get('details', {}).get('action_context', 'N/A') }}</div>
-            <div class="summary-item"><strong>Idioma:</strong> {{ session.get('details', {}).get('language', 'N/A') }}</div>
-            <div class="summary-item"><strong>Sotaque:</strong> {{ session.get('details', {}).get('accent', 'N/A') }}</div>
-            <div class="summary-item"><strong>Estilo Visual:</strong> {{ session.get('details', {}).get('visual_style', 'N/A') }}</div>
-            <div class="summary-item"><strong>Câmera:</strong> {{ session.get('details', {}).get('camera_style', 'N/A') }}</div>
+            <div class="summary-item"><strong>Personagens:</strong> <span class="text-white">{{ session.get('characters', [])|map(attribute='name')|join(', ') }}</span></div>
+            <div class="summary-item"><strong>Cenário:</strong> <span class="text-white">{{ session.get('scenario', {}).get('name', 'N/A') }}</span></div>
+            <div class="summary-item"><strong>Contexto da Ação:</strong> <span class="text-white">{{ session.get('details', {}).get('action_context', 'N/A') }}</span></div>
+            <div class="summary-item">
+                <strong>Idioma do Diálogo - Sotaque:</strong> 
+                <span class="text-white">
+                    {{ session.get('details', {}).get('language', 'N/A') }}
+                    {% if session.get('details', {}).get('accent') and session.get('details', {}).get('language') == 'Português (Brasil)' %}
+                        - {{ session.get('details', {}).get('accent') }}
+                    {% endif %}
+                </span>
+            </div>
+            <div class="summary-item"><strong>Estilo Visual:</strong> <span class="text-white">{{ session.get('details', {}).get('visual_style', 'N/A') }}</span></div>
+            <div class="summary-item"><strong>Estilo da Câmera:</strong> <span class="text-white">{{ session.get('details', {}).get('camera_style', 'N/A') }}</span></div>
         </div>
-    </div>
+        
+        <!-- MUDANÇA: Diálogos movidos para dentro da seção de resumo -->
+        {% set dialogues = session.get('details', {}).get('dialogues', []) %}
+        {% if dialogues %}
+            {# CORREÇÃO: Cria um dicionário para mapear IDs de personagens a nomes para uma busca mais confiável #}
+            {% set character_map = {} %}
+            {% for char in session.get('characters', []) %}
+                {% set _ = character_map.update({char.id|string: char.name}) %}
+            {% endfor %}
 
-    <div id="editor-sections">
-        <div class="form-group">
-            <label for="scenario-edit">Ficha Técnica do Cenário (Apenas Leitura)</label>
-            <textarea id="scenario-edit" readonly>{{ session.get('scenario', {}).get('description', '') }}</textarea>
-        </div>
-        {% for char in session.get('characters', []) %}
-        <div class="form-group">
-            <label for="char-edit-{{ char.id }}">Ficha Técnica de {{ char.name }} (Apenas Leitura)</label>
-            <textarea id="char-edit-{{ char.id }}" readonly>{{ char.description }}</textarea>
-        </div>
-        {% endfor %}
+            <hr class="border-gray-700 my-4">
+            <div>
+                <strong class="text-primary-color">Diálogos da Cena:</strong>
+                {% for dialogue in dialogues %}
+                    <div class="dialogue-item">
+                        <strong>{{ character_map.get(dialogue.charId|string, 'Personagem Desconhecido') }}:</strong>
+                        <span class="text-white italic">"{{ dialogue.text }}"</span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
     </div>
     
     <div class="button-group">
         <a href="{{ url_for('detalhes') }}" class="main-button back-button" style="text-align: center; text-decoration: none;">&larr; Voltar</a>
-        <button id="save-btn" class="main-button save-button" onclick="saveComponents()">Salvar Componentes na Biblioteca</button>
-        <button id="assemble-btn" class="main-button assemble-button" onclick="assemblePrompt()">Montar Prompt Final</button>
+        <button id="assemble-btn" class="main-button assemble-button" onclick="assemblePrompt()">Montar Prompt Final com IA</button>
     </div>
 
     <div class="result-wrapper" id="result-wrapper">
@@ -68,60 +94,30 @@
         <button class="copy-button" onclick="copyPrompt()">Copiar</button>
         <pre id="final-prompt-output"></pre>
     </div>
+
+    <div id="post-generation-actions" class="hidden mt-6">
+        <h2 class="text-lg font-semibold mb-3 text-primary-color">Salvar Componentes na Biblioteca</h2>
+        <p class="text-sm text-gray-400 mb-4">Salve os componentes criados pela IA para reutilizá-los em outros projetos.</p>
+        <div id="save-buttons-container" class="flex flex-wrap gap-3">
+            <!-- Botões de salvar serão inseridos aqui pelo JavaScript -->
+        </div>
+        <div id="save-status-message" class="text-sm mt-3 h-4"></div>
+    </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Dados do servidor são injetados de forma segura aqui
     const serverData = {{ server_data|tojson|safe }};
+    let lastGeneratedPrompt = ""; // Variável para guardar o último prompt gerado
 
-    // A função saveComponents agora funciona corretamente, pois não há mais confusão
-    // sobre qual versão (editada ou da sessão) ela deveria salvar. Ela sempre salvará a da sessão.
-    async function saveComponents() {
-        const saveBtn = document.getElementById('save-btn');
-        saveBtn.disabled = true;
-        saveBtn.innerText = 'Salvando...';
-
-        try {
-            // Esta chamada agora não envia um 'body', pois o backend pega os dados da sessão
-            const response = await fetch("{{ url_for('save_components') }}", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
-            const data = await response.json();
-            alert(data.message);
-        } catch (error) {
-            alert(`Erro ao salvar: ${error.message}`);
-        } finally {
-            saveBtn.disabled = false;
-            saveBtn.innerText = 'Salvar Componentes na Biblioteca';
-        }
-    }
-
-    // A função para montar o prompt final foi atualizada para coletar os dados
-    // das textareas (agora readonly) de forma segura.
     async function assemblePrompt() {
         const assembleBtn = document.getElementById('assemble-btn');
         assembleBtn.disabled = true;
         assembleBtn.innerText = 'Montando... (Pode levar até 1 min)';
-        
-        const scenarioDesc = document.getElementById('scenario-edit').value;
-        const editedCharacters = serverData.characters.map(char => {
-            const descriptionElement = document.getElementById(`char-edit-${char.id}`);
-            return {
-                id: char.id,
-                name: char.name,
-                concept: char.concept,
-                description: descriptionElement ? descriptionElement.value : char.description
-            };
-        });
 
         const payload = {
-            characters: editedCharacters,
-            scenario: { 
-                concept: serverData.scenario.concept || '',
-                description: scenarioDesc 
-            },
+            characters: serverData.characters || [],
+            scenario: serverData.scenario || {},
             details: serverData.details || {}
         };
 
@@ -135,14 +131,12 @@
                 body: JSON.stringify(payload),
                 signal: controller.signal
             });
-
+            
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({
-                    error: `Erro do servidor: ${response.status} ${response.statusText}`
-                }));
-                throw new Error(errorData.error || errorData.message || 'Falha na comunicação com o servidor.');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `Erro do servidor: ${response.status}`);
             }
             
             const data = await response.json();
@@ -151,25 +145,86 @@
                  throw new Error(data.error);
             }
 
-            document.getElementById('final-prompt-output').innerText = data.prompt;
+            lastGeneratedPrompt = data.prompt; // Salva o prompt gerado
+            document.getElementById('final-prompt-output').innerText = lastGeneratedPrompt;
             document.getElementById('result-wrapper').style.display = 'block';
+
+            renderSaveButtons();
+            document.getElementById('post-generation-actions').classList.remove('hidden');
+
             window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 
         } catch (error) {
             let errorMessage = 'Ocorreu um erro desconhecido.';
             if (error.name === 'AbortError') {
-                errorMessage = 'A requisição demorou muito e foi cancelada. Por favor, tente novamente.';
-            } else if (error.message) {
+                errorMessage = 'A requisição demorou muito e foi cancelada. Tente novamente.';
+            } else {
                 errorMessage = error.message;
             }
             alert(`Erro ao montar o prompt: ${errorMessage}`);
         } finally {
             assembleBtn.disabled = false;
-            assembleBtn.innerText = 'Montar Prompt Final';
+            assembleBtn.innerText = 'Montar Prompt Final com IA';
         }
     }
 
-    // Função para copiar o prompt
+    function renderSaveButtons() {
+        const container = document.getElementById('save-buttons-container');
+        container.innerHTML = ''; // Limpa botões antigos
+
+        // Cria botão para salvar o cenário
+        if (serverData.scenario && serverData.scenario.name) {
+            const scenButton = document.createElement('button');
+            scenButton.className = 'save-component-btn';
+            scenButton.innerText = `Salvar Cenário: "${serverData.scenario.name}"`;
+            scenButton.onclick = () => saveComponent('scenario', serverData.scenario.name);
+            container.appendChild(scenButton);
+        }
+
+        // Cria botões para salvar cada personagem
+        if (serverData.characters && serverData.characters.length > 0) {
+            serverData.characters.forEach(char => {
+                const charButton = document.createElement('button');
+                charButton.className = 'save-component-btn';
+                charButton.innerText = `Salvar Personagem: "${char.name}"`;
+                charButton.onclick = () => saveComponent('character', char.name);
+                container.appendChild(charButton);
+            });
+        }
+    }
+
+    async function saveComponent(type, name) {
+        const statusMessage = document.getElementById('save-status-message');
+        statusMessage.className = 'text-sm text-cyan-400 mt-3 h-4';
+        statusMessage.innerText = `Salvando "${name}"...`;
+
+        try {
+            // Esta rota ainda não existe, precisaremos criá-la no app.py
+            const response = await fetch('/save_from_prompt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    component_type: type,
+                    component_name: name,
+                    full_prompt_text: lastGeneratedPrompt
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Erro desconhecido no servidor.');
+            }
+            
+            statusMessage.className = 'text-sm text-green-400 mt-3 h-4';
+            statusMessage.innerText = data.message;
+
+        } catch (error) {
+            statusMessage.className = 'text-sm text-red-400 mt-3 h-4';
+            statusMessage.innerText = `Erro ao salvar: ${error.message}`;
+        }
+    }
+
     function copyPrompt() {
         const textToCopy = document.getElementById('final-prompt-output').innerText;
         navigator.clipboard.writeText(textToCopy).then(() => {
@@ -178,29 +233,5 @@
             alert('Falha ao copiar para a área de transferência.');
         });
     }
-
-    // Revertendo a função de salvar para o comportamento original, pois não há mais edição
-    document.getElementById('save-btn').addEventListener('click', async () => {
-        const saveBtn = document.getElementById('save-btn');
-        saveBtn.disabled = true;
-        saveBtn.innerText = 'Salvando...';
-
-        try {
-            const response = await fetch("{{ url_for('save_components') }}", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                // Enviando os dados da sessão, que agora são a única fonte da verdade
-                body: JSON.stringify(serverData) 
-            });
-            const data = await response.json();
-            alert(data.message);
-        } catch (error) {
-            alert(`Erro ao salvar: ${error.message}`);
-        } finally {
-            saveBtn.disabled = false;
-            saveBtn.innerText = 'Salvar Componentes na Biblioteca';
-        }
-    });
-
 </script>
 {% endblock %}

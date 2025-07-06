@@ -1,6 +1,7 @@
 import os
 import json
-import google.generativeai as genai
+import re # Importa a biblioteca de expressões regulares para a busca no texto
+import requests
 from flask import Flask, render_template, request, url_for, flash, redirect, session, jsonify, make_response
 from dotenv import load_dotenv
 from flask_sqlalchemy import SQLAlchemy
@@ -15,8 +16,8 @@ from flask_session import Session
 load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'd9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4')
-api_key = os.getenv("GEMINI_API_KEY")
-if api_key: genai.configure(api_key=api_key)
+
+api_key = os.getenv("NVIDIA_API_KEY")
 
 db_url = os.getenv('DATABASE_URL')
 if not db_url: raise ValueError("DATABASE_URL not set")
@@ -59,6 +60,7 @@ class SavedCharacter(db.Model):
 
 class SavedScenario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), nullable=False)
     concept = db.Column(db.Text, nullable=False)
     description = db.Column(db.Text, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -90,7 +92,6 @@ def login():
         user = User.query.filter_by(email=form.email.data).first()
         if user and bcrypt.check_password_hash(user.password_hash, form.password.data):
             login_user(user, remember=True)
-            
             redirect_target = request.form.get('redirect_choice')
             if redirect_target == 'biblioteca':
                 return redirect(url_for('biblioteca'))
@@ -125,6 +126,7 @@ def logout():
 def goodbye():
     return render_template('goodbye.html')
 
+
 # --- ROTAS DO FLUXO "WIZARD" ---
 @app.route('/')
 @login_required
@@ -142,7 +144,6 @@ def oficina():
             flash('Adicione pelo menos um personagem para continuar.', 'danger')
             return redirect(url_for('oficina'))
         return redirect(url_for('detalhes'))
-    
     return render_template('oficina.html', 
                            saved_characters=session.get('characters', []), 
                            saved_scenario=session.get('scenario', {}))
@@ -165,14 +166,13 @@ def resumo():
     if 'details' not in session:
         flash('Você precisa passar pelos detalhes antes de ver o resumo.', 'info')
         return redirect(url_for('detalhes'))
-    
     server_data = {
         "characters": session.get('characters', []),
         "details": session.get('details', {}),
         "scenario": session.get('scenario', {})
     }
-    
     return render_template('resumo.html', server_data=server_data)
+
 
 # --- ROTAS DA BIBLIOTECA ---
 @app.route('/biblioteca')
@@ -180,7 +180,7 @@ def resumo():
 def biblioteca():
     session.clear()
     user_characters = SavedCharacter.query.filter_by(user_id=current_user.id).order_by(SavedCharacter.name).all()
-    user_scenarios = SavedScenario.query.filter_by(user_id=current_user.id).order_by(SavedScenario.concept).all()
+    user_scenarios = SavedScenario.query.filter_by(user_id=current_user.id).order_by(SavedScenario.name).all()
     return render_template('biblioteca.html', 
                            characters=user_characters, 
                            scenarios=user_scenarios)
@@ -205,7 +205,8 @@ def carregar_da_biblioteca():
         scenario_from_db = db.session.get(SavedScenario, int(scen_id))
         if scenario_from_db and scenario_from_db.user_id == current_user.id:
             loaded_scenario = {
-                'concept': scenario_from_db.concept, 'description': scenario_from_db.description
+                'name': scenario_from_db.name,
+                'description': scenario_from_db.description
             }
     if not loaded_characters:
         flash('Selecione pelo menos um personagem para carregar.', 'danger')
@@ -214,46 +215,6 @@ def carregar_da_biblioteca():
     session['scenario'] = loaded_scenario
     return redirect(url_for('detalhes'))
 
-@app.route('/save_components', methods=['POST'])
-@login_required
-def save_components():
-    data = request.get_json()
-    if not data:
-        return jsonify({'success': False, 'message': 'Nenhum dado recebido.'}), 400
-
-    characters = data.get('characters', [])
-    scenario = data.get('scenario', {})
-    
-    if not characters and not scenario.get('concept'):
-        return jsonify({'success': False, 'message': 'Não há nada na sessão atual para salvar.'}), 400
-    try:
-        saved_count = 0
-        for char_data in characters:
-            exists = SavedCharacter.query.filter_by(user_id=current_user.id, name=char_data['name']).first()
-            if not exists:
-                new_char = SavedCharacter(
-                    name=char_data['name'], concept=char_data['concept'],
-                    description=char_data['description'], user_id=current_user.id
-                )
-                db.session.add(new_char)
-                saved_count += 1
-        if scenario.get('concept'):
-            exists = SavedScenario.query.filter_by(user_id=current_user.id, concept=scenario['concept']).first()
-            if not exists:
-                new_scen = SavedScenario(
-                    concept=scenario['concept'], description=scenario['description'],
-                    user_id=current_user.id
-                )
-                db.session.add(new_scen)
-                saved_count += 1
-        if saved_count > 0:
-            db.session.commit()
-            return jsonify({'success': True, 'message': f'{saved_count} novo(s) componente(s) salvo(s) na sua biblioteca!'})
-        else:
-            return jsonify({'success': True, 'message': 'Todos os componentes desta sessão já estavam salvos.'})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': f'Erro no servidor: {e}'}), 500
 
 @app.route('/delete_asset/<string:asset_type>/<int:asset_id>', methods=['POST'])
 @login_required
@@ -271,69 +232,52 @@ def delete_asset(asset_type, asset_id):
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro no servidor: {e}'}), 500
 
-# --- MICRO-ROTAS E FUNÇÕES FINAIS (IA) ---
+
+# --- FUNÇÕES E ROTA DE IA ---
+
 def generate_ia_content(instruction):
-    if not api_key: return "Erro: A chave da API do Gemini não foi configurada no servidor."
-    # Use 'gemini-1.5-pro-latest' for higher quality results on a paid plan
-    model = genai.GenerativeModel('gemini-1.5-pro-latest')
+    if not api_key:
+        return "Erro: A chave da API da NVIDIA não foi configurada no servidor."
+
+    invoke_url = "https://integrate.api.nvidia.com/v1/chat/completions"
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Accept": "application/json",
+    }
+
+    payload = {
+        "model": "meta/llama3-8b-instruct",
+        "messages": [
+            {
+                "content": instruction,
+                "role": "user"
+            }
+        ],
+        "temperature": 0.7,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "stream": False
+    }
+
     try:
-        response = model.generate_content(instruction)
-        return response.text.strip()
-    except Exception as e: return f"Erro na IA: {e}"
+        response = requests.post(invoke_url, headers=headers, json=payload)
+        response.raise_for_status()
+        
+        response_body = response.json()
+        ai_content = response_body['choices'][0]['message']['content']
+        return ai_content.strip()
 
-@app.route('/generate/character_description', methods=['POST'])
-@login_required
-def generate_character_description():
-    concept = request.json.get('concept')
-    instruction = f"""
-    Gere uma ficha de personagem detalhada e rica em português, baseada no conceito a seguir.
-    **REGRAS ESTRITAS:**
-    1.  NÃO use markdown como '**' ou '##'.
-    2.  Use um formato de lista com hífens (-).
-    3.  Seja descritivo e vívido em cada item da lista.
-    4.  Responda APENAS com a lista de atributos, sem frases de introdução ou conclusão.
+    except requests.exceptions.RequestException as e:
+        error_details = f"Erro de conexão com a API da NVIDIA: {e}"
+        if e.response is not None:
+            error_details += f" | Status: {e.response.status_code} | Resposta: {e.response.text}"
+        return error_details
+    except (KeyError, IndexError) as e:
+        return f"Erro ao processar a resposta da API da NVIDIA: formato inesperado. {e}"
+    except Exception as e:
+        return f"Erro na IA: {e}"
 
-    **CONCEITO:** '{concept}'
-
-    **FORMATO OBRIGATÓRIO (Preencha com detalhes):**
-    - Aparência Geral: [Descreva a primeira impressão, idade aparente, etnia, físico e altura.]
-    - Rosto e Expressão: [Detalhe os traços faciais, cor e expressão dos olhos, estilo e cor do cabelo, e marcas distintas.]
-    - Vestimenta: [Descreva as roupas, incluindo tecido, corte, e estado (novas, gastas). Mencione acessórios importantes.]
-    - Postura e Linguagem Corporal: [Como o personagem se porta? Confiante, curvado, rígido? Como ele se move?]
-    """
-    description = generate_ia_content(instruction)
-    return jsonify({'description': description})
-
-@app.route('/generate/scene_description', methods=['POST'])
-@login_required
-def generate_scene_description():
-    concept = request.json.get('concept')
-    instruction = f"""
-    Gere uma descrição de cenário detalhada e imersiva em português, baseada no conceito a seguir.
-    **REGRAS ESTRITAS:**
-    1.  NÃO use markdown como '**' ou '##'.
-    2.  Use um formato de lista com hífens (-).
-    3.  Foque em criar uma atmosfera forte e rica em detalhes em cada item.
-    4.  Responda APENAS com a lista de atributos, sem frases de introdução ou conclusão.
-
-    **CONCEITO:** '{concept}'
-
-    **FORMATO OBRIGATÓRIO (Preencha com detalhes):**
-    - Localização e Visão Geral: [Onde estamos? Descreva os elementos principais (prédios, natureza, mobília) e as cores predominantes.]
-    - Iluminação e Atmosfera: [Qual é a fonte de luz? Como as sombras se comportam? Qual é a sensação geral do lugar (opressiva, pacífica, misteriosa)?]
-    - Sons e Cheiros: [Quais sons preenchem o ambiente (vento, máquinas, silêncio)? Existem cheiros distintos (maresia, fumaça, umidade)?]
-    - Clima e Sensações: [Está frio, quente, úmido? O ar está parado ou há vento? O que alguém sentiria na pele neste lugar?]
-    """
-    description = generate_ia_content(instruction)
-    return jsonify({'description': description})
-
-@app.route('/generate/summary', methods=['POST'])
-@login_required
-def generate_summary():
-    concept = request.json.get('concept')
-    instruction = f"Resuma o seguinte conceito de personagem em um nome curto e impactante de 1 a 2 palavras em português. Conceito: '{concept}'"
-    summary = generate_ia_content(instruction)
-    return jsonify({'summary': summary})
 
 @app.route('/montar-prompt', methods=['POST'])
 @login_required
@@ -344,91 +288,143 @@ def montar_prompt():
     details = data.get('details', {})
     language = details.get('language', 'English') 
     
-    character_sheets = "\n".join([f"- Technical Sheet for '{c.get('name')}':\n{c.get('description')}" for c in characters])
+    character_concepts = "\n".join([f"- Character Concept for '{c.get('name')}': {c.get('description')}" for c in characters])
+    scenario_concept = f"- Scenario Concept for '{scenario.get('name')}': {scenario.get('description')}"
     
     dialogue_lines_pt_br = []
     if details.get('dialogues'):
       for d in details.get('dialogues', []):
-          char_name = next((c['name'] for c in characters if c['id'] == d.get('charId')), "Character")
+          char_name = next((c['name'] for c in characters if str(c['id']) == str(d.get('charId'))), "Character")
           dialogue_lines_pt_br.append(f"- {char_name}: \"{d.get('text')}\"")
 
+    # MUDANÇA: Instrução final completamente refeita para ser mais direta, procedural e rigorosa.
     final_assembly_instruction = f"""
-    You are an expert prompt engineer for a generative video AI. Your task is to transform the raw data below into a final, structured video prompt.
+    You are a professional prompt engineer. Your only task is to generate a complete video prompt by precisely following the structure and rules below.
 
-    **PRIMARY RULES:**
-    1.  **Output Language:** The entire final prompt structure, titles, and descriptions MUST be in ENGLISH.
-    2.  **Translate Dialogue:** The dialogues are provided in Brazilian Portuguese. You MUST translate them to **{language}**. The final output must contain only the translated dialogue.
-    3.  **No Markdown:** Do NOT use any markdown formatting like '**' or '##' in the final output.
-    4.  **Scene Structuring:** You have 8 seconds total. Based on the dialogues, structure them into one or a maximum of two scenes (🎞️ Scene 01, 🎞️ Scene 02). Group dialogues logically and create a short, descriptive 'Action:' line for each scene.
-    5.  **Attribute Dialogue:** In the 'Dialogue' line for each scene, you MUST attribute each piece of dialogue to the character speaking. Use formats like "CharacterName says, '[Dialogue]'" or "CharacterName responds, '[Dialogue]'".
-
-    **RAW DATA TO TRANSFORM:**
-    - Action Context: "{details.get('action_context')}"
-    - Visual Style: "{details.get('visual_style')}"
-    - Camera Style: "{details.get('camera_style')}"
-    - Scene Technical Sheet: {scenario.get('description')}
-    - Character Technical Sheets:
-      {character_sheets}
-    - Dialogue Sequence (provided in PT-BR, to be translated to {language}):
+    **USER'S RAW DATA:**
+    Action Context: "{details.get('action_context')}"
+    Visual Style: "{details.get('visual_style')}"
+    Character Concepts:
+      {character_concepts}
+    Scenario Concept:
+      {scenario_concept}
+    Dialogue Sequence (to be translated to {language}):
       {"\n".join(dialogue_lines_pt_br) if dialogue_lines_pt_br else "No dialogue provided."}
 
-    **REQUIRED OUTPUT MODEL (Fill all details based on RAW DATA):**
-    Prompt Title:
-    [Generate a 1-3 word title in ENGLISH here based on the action context]
+    **GENERATION TASK - Follow this structure EXACTLY:**
 
-    Scene Setup:
-    [Based on the Scene Technical Sheet, create a list of key environmental details like Location, Lighting, Atmosphere, and Key Elements. Be descriptive.]
+    🎬 Prompt Title:
+    [Generate a 1-3 word title in ENGLISH based on the Action Context]
 
-    Character - [Character Name 1]:
-    [Based on the Character Technical Sheet, create a list of key visual details like General Appearance, Face, Clothing, and Posture.]
-    
-    (Repeat for each character)
+    🌍 Scene Setup:
+    <scen_{scenario.get('name', 'default').replace(' ', '_')}_start>
+    Location: [Expand the Scenario Concept into a detailed description of the location.] Lighting: [Describe the lighting of the scene.] Atmosphere: [Describe the atmosphere, sounds, and smells.]
+    </scen_{scenario.get('name', 'default').replace(' ', '_')}_end>
 
-    --- SCENE BREAKDOWN ---
+    {"\n---\n\n".join([f"""👤 Character Profile: {c.get('name')}
+    <char_{c.get('name').replace(' ', '_')}_start>
+    Age: [Expand the Character Concept for '{c.get('name')}' into their age.] Ethnicity: [Describe their ethnicity.] Height: [Describe their height and build.] Face: [Describe their facial features.] Eyes: [Describe their eyes.]Hair: [Describe their hair.]
+    </char_{c.get('name').replace(' ', '_')}_end>
+    Attire: [Describe what this character is wearing in this specific scene.] Posture: [Describe their posture.] Facial Expression: [Describe their facial expression.]
+""" for c in characters])}
 
-    🎞️ Scene 01 (0.0s – [end time]s):
-    - Action: [AI-generated description of the action for this scene, based on context and dialogue.]
-    - 🗣️ Dialogue ({language}): [Combine the translated dialogues for this scene, attributing each one clearly. FOR EXAMPLE: 'Character 1 says, "Hello there.", Character 2 responds, "General Kenobi."']
-    - Camera: [{details.get('camera_style')}]
-    - Light: [Describe the scene's lighting, based on the setup.]
-    - Audio: [Describe the background audio.]
-    - Mood: [Describe the mood of the scene.]
+    🎞️ Scene Breakdown
+    Scene 01 (0.0s – 4.5s):
+    Action: [Describe what the characters are doing, ensuring the action is directly inspired by the "Action Context".]
+    Dialogue ({language}): [Translate the first dialogue line and attribute it in the format: Character Name says, "Translated text.".]
+    Camera: [Describe a camera movement and framing for this scene.]
+    Cinematography: [Describe a technical detail for this scene.]
 
-    (If you decide a second scene is necessary, create it here. Otherwise, omit this block.)
-    🎞️ Scene 02 ([start time]s – 8.0s):
-    - Action: [AI-generated description of the action for this scene.]
-    - 🗣️ Dialogue ({language}): [Translated dialogue(s) for scene 2, attributed to the speaker. If none, write '(No dialogue)'.]
-    - Camera: [Describe camera movement and shot type.]
-    - Light: [Describe the scene's lighting.]
-    - Audio: [Describe the background audio.]
-    - Atmosphere: [Describe the atmosphere of the scene.]
+    Scene 02 (4.5s – 8.0s):
+    Action: [Describe the continuing action for this scene.]
+    Dialogue ({language}): [Translate the second dialogue line and attribute it.]
+    Camera: [Describe a different camera movement and framing.]
+    Cinematography: [Describe another technical detail.]
 
-    ⚙️ Final AI Instructions:
-    - Duration: 8 seconds
-    - Aspect Ratio: 16:9
-    - Dialogue Language: {language}, lip sync enabled.
-    - Focus: Always on the active character.
-    - Visual Style: {details.get('visual_style')}
-    - Output must not contain watermarks or subtitles.
-    - Audio: Clean, continuous background audio, no additional voiceover.
+    ⚙️ Final Instructions for IA:
+    Visual Style: {details.get('visual_style')} shot on an ARRI Alexa camera. Color Grading: [Describe a color grading style.] Duration: 8 seconds. Language: {language} with perfect lip-sync. Audio: [Describe the audio mix.] Output: No watermarks, no subtitles.
     """
     final_prompt = generate_ia_content(final_assembly_instruction)
     return jsonify({'prompt': final_prompt})
 
-# --- ROTA DE ADMINISTRAÇÃO PARA RESETAR O BANCO DE DADOS ---
-@app.route('/reset-database')
-def reset_database():
-    secret_key = request.args.get('secret')
-    if secret_key != 'startfresh':
-        return "Acesso não autorizado.", 403
+
+@app.route('/save_from_prompt', methods=['POST'])
+@login_required
+def save_from_prompt():
+    data = request.json
+    component_type = data.get('component_type')
+    component_name = data.get('component_name')
+    full_prompt_text = data.get('full_prompt_text')
+
+    if not all([component_type, component_name, full_prompt_text]):
+        return jsonify({'success': False, 'message': 'Dados incompletos.'}), 400
+
+    sanitized_name = component_name.replace(' ', '_')
+    
+    if component_type == 'character':
+        start_tag = f"<char_{sanitized_name}_start>"
+        end_tag = f"</char_{sanitized_name}_end>"
+    elif component_type == 'scenario':
+        start_tag = f"<scen_{sanitized_name}_start>"
+        end_tag = f"</scen_{sanitized_name}_end>"
+    else:
+        return jsonify({'success': False, 'message': 'Tipo de componente inválido.'}), 400
+
     try:
-        flash('Iniciando reset do banco de dados...', 'info')
+        pattern = re.compile(f"{re.escape(start_tag)}(.*?){re.escape(end_tag)}", re.DOTALL)
+        match = pattern.search(full_prompt_text)
+        
+        if not match:
+            return jsonify({'success': False, 'message': f'Não foi possível encontrar a descrição para "{component_name}" no prompt.'}), 404
+
+        description = match.group(1).strip()
+
+        if component_type == 'character':
+            exists = SavedCharacter.query.filter_by(user_id=current_user.id, name=component_name).first()
+            if exists:
+                return jsonify({'success': True, 'message': f'"{component_name}" já estava salvo.'})
+            
+            new_char = SavedCharacter(
+                name=component_name,
+                concept=description,
+                description=description,
+                user_id=current_user.id
+            )
+            db.session.add(new_char)
+
+        elif component_type == 'scenario':
+            exists = SavedScenario.query.filter_by(user_id=current_user.id, name=component_name).first()
+            if exists:
+                return jsonify({'success': True, 'message': f'"{component_name}" já estava salvo.'})
+
+            new_scen = SavedScenario(
+                name=component_name,
+                concept=description,
+                description=description,
+                user_id=current_user.id
+            )
+            db.session.add(new_scen)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': f'"{component_name}" salvo com sucesso na biblioteca!'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro no servidor ao salvar: {e}'}), 500
+
+
+# --- COMANDOS DE ADMINISTRAÇÃO VIA TERMINAL ---
+@app.cli.command("init-db")
+def init_db_command():
+    """Apaga todas as tabelas e as recria do zero. Perde todos os dados."""
+    try:
+        print("Iniciando o reset do banco de dados...")
         db.drop_all()
         db.create_all()
-        flash('Banco de dados zerado e recriado com sucesso! Por favor, crie uma nova conta.', 'success')
-        return redirect(url_for('register'))
+        print("Banco de dados zerado e recriado com sucesso.")
+        print("Lembre-se de criar uma nova conta de usuário.")
     except Exception as e:
-        return f"Ocorreu um erro durante o reset: {e}", 500
+        print(f"Ocorreu um erro durante o reset: {e}")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
