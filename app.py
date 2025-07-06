@@ -300,10 +300,11 @@ def montar_prompt():
     # MUDANÇA: Instrução final completamente refeita para ser mais direta, procedural e rigorosa.
     final_assembly_instruction = f"""
     You are a professional prompt engineer. Your only task is to generate a complete video prompt by precisely following the structure and rules below.
-
+    
     **USER'S RAW DATA:**
     Action Context: "{details.get('action_context')}"
     Visual Style: "{details.get('visual_style')}"
+    Camera Style: "{details.get('camera_style')}"
     Character Concepts:
       {character_concepts}
     Scenario Concept:
@@ -313,36 +314,33 @@ def montar_prompt():
 
     **GENERATION TASK - Follow this structure EXACTLY:**
 
-    🎬 Prompt Title:
+    Prompt Title:
     [Generate a 1-3 word title in ENGLISH based on the Action Context]
-
-    🌍 Scene Setup:
-    <scen_{scenario.get('name', 'default').replace(' ', '_')}_start>
-    Location: [Expand the Scenario Concept into a detailed description of the location.] Lighting: [Describe the lighting of the scene.] Atmosphere: [Describe the atmosphere, sounds, and smells.]
-    </scen_{scenario.get('name', 'default').replace(' ', '_')}_end>
-
+    Initial AI Instructions:
+    Visual Style: {details.get('visual_style')} Camera Style: {details.get('camera_style')} Language: {language} with perfect lip-sync.
     {"\n---\n\n".join([f"""👤 Character Profile: {c.get('name')}
     <char_{c.get('name').replace(' ', '_')}_start>
-    Age: [Expand the Character Concept for '{c.get('name')}' into their age.] Ethnicity: [Describe their ethnicity.] Height: [Describe their height and build.] Face: [Describe their facial features.] Eyes: [Describe their eyes.]Hair: [Describe their hair.]
+    Gender: [Expand the character concept to '{c.get('name')}' for their gender.] Age: [Describe their age.] Ethnicity: [Describe their ethnicity.] Height: [Describe their height and build.] Face: [Describe their facial features.] Eyes: [Describe their eyes.]Hair: [Describe their hair.]
     </char_{c.get('name').replace(' ', '_')}_end>
     Attire: [Describe what this character is wearing in this specific scene.] Posture: [Describe their posture.] Facial Expression: [Describe their facial expression.]
 """ for c in characters])}
-
-    🎞️ Scene Breakdown
-    Scene 01 (0.0s – 4.5s):
+    Scene Breakdown
+    Scene 01 (0.0s – 4.0s):
     Action: [Describe what the characters are doing, ensuring the action is directly inspired by the "Action Context".]
-    Dialogue ({language}): [Translate the first dialogue line and attribute it in the format: Character Name says, "Translated text.".]
+    Dialogue ({language}): [Translate the first dialogue line and attribute it in the format: Character Name says "Translated text.".]
     Camera: [Describe a camera movement and framing for this scene.]
     Cinematography: [Describe a technical detail for this scene.]
-
-    Scene 02 (4.5s – 8.0s):
+    Scene 02 (4.0s – 8.0s):
     Action: [Describe the continuing action for this scene.]
     Dialogue ({language}): [Translate the second dialogue line and attribute it.]
-    Camera: [Describe a different camera movement and framing.]
-    Cinematography: [Describe another technical detail.]
-
-    ⚙️ Final Instructions for IA:
-    Visual Style: {details.get('visual_style')} shot on an ARRI Alexa camera. Color Grading: [Describe a color grading style.] Duration: 8 seconds. Language: {language} with perfect lip-sync. Audio: [Describe the audio mix.] Output: No watermarks, no subtitles.
+    Camera: [Describe a camera movement and framing for this scene.]
+    Cinematography: [Describe a technical detail for this scene.]
+    Scene Setup:
+    <scen_{scenario.get('name', 'default').replace(' ', '_')}_start>
+    Location: [Expand the Scenario Concept into a detailed description of the location.] Lighting: [Describe the lighting of the scene.] Atmosphere: [Describe the atmosphere, sounds, and smells.]
+    </scen_{scenario.get('name', 'default').replace(' ', '_')}_end>
+    Instructions Final for IA:
+    Visual Style: {details.get('visual_style')} Color Grading: [Describe a color grading style.] Duration: 8 seconds. Language: {language} with perfect lip-sync. Audio: [Describe the audio mix.] Output: No watermarks, no subtitles.
     """
     final_prompt = generate_ia_content(final_assembly_instruction)
     return jsonify({'prompt': final_prompt})
