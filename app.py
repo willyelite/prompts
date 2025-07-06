@@ -320,7 +320,7 @@ def montar_prompt():
     Visual Style: {details.get('visual_style')} Camera Style: {details.get('camera_style')} Language: {language} with perfect lip-sync.
     {"\n---\n\n".join([f"""👤 Character Profile: {c.get('name')}
     <char_{c.get('name').replace(' ', '_')}_start>
-    Gender: [Expand the character concept to '{c.get('name')}' for their gender.] Age: [Describe their age.] Ethnicity: [Describe their ethnicity.] Height: [Describe their height and build.] Face: [Describe their facial features.] Eyes: [Describe their eyes.]Hair: [Describe their hair.]
+    Gender: [Expand the character concept to '{c.get('name')}' for their gender.] Age: [Describe their age.] Ethnicity: [Describe their ethnicity.] Height: [Describe their height and build.] Face: [Describe their facial features.] Eyes: [Describe their eyes.] Hair and Beard: [Describe their hair and beard.]
     </char_{c.get('name').replace(' ', '_')}_end>
     Attire: [Describe what this character is wearing in this specific scene.] Posture: [Describe their posture.] Facial Expression: [Describe their facial expression.]
 """ for c in characters])}
