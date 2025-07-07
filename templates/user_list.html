@@ -1,0 +1,56 @@
+{% extends "layout.html" %}
+
+{% block title %}Lista de Usuários{% endblock %}
+
+{% block content %}
+<style>
+    .user-list-container {
+        background-color: var(--surface-color);
+        padding: 2rem;
+        border-radius: 12px;
+    }
+    .user-list-container h1 {
+        color: var(--primary-color);
+        margin-top: 0;
+    }
+    .user-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1.5rem;
+    }
+    .user-table th, .user-table td {
+        padding: 12px 15px;
+        border-bottom: 1px solid var(--border-color);
+        text-align: left;
+    }
+    .user-table th {
+        background-color: var(--bg-color);
+    }
+</style>
+
+<div class="user-list-container">
+    <h1>Usuários Registrados</h1>
+    <p><a href="{{ url_for('admin_page') }}">&larr; Voltar ao Painel Admin</a></p>
+
+    <table class="user-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Email</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.email }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="2">Nenhum usuário encontrado.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

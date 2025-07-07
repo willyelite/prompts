@@ -44,14 +44,19 @@
 <body>
     <nav class="main-nav">
         <div class="nav-container">
-            {% if current_user.is_authenticated %}
-                <span class="nav-user-info">Logado como: <strong>{{ current_user.email }}</strong></span>
-                <a href="{{ url_for('logout') }}" class="nav-link logout">Sair</a>
-            {% else %}
-                <a href="{{ url_for('login') }}" class="nav-link">Login</a>
-                <a href="{{ url_for('register') }}" class="nav-link">Cadastrar</a>
-            {% endif %}
-        </div>
+			{% if current_user.is_authenticated %}
+				<span class="nav-user-info">Logado como: <strong>{{ current_user.email }}</strong></span>
+
+			{% if current_user.email == '123@456.com' %}
+				<a href="{{ url_for('admin_page') }}" class="nav-link">Admin</a>
+			{% endif %}
+
+			<a href="{{ url_for('logout') }}" class="nav-link logout">Sair</a>
+		{% else %}
+			<a href="{{ url_for('login') }}" class="nav-link">Login</a>
+			<a href="{{ url_for('register') }}" class="nav-link">Cadastrar</a>
+		{% endif %}
+		</div>
     </nav>
 
     <main class="container">
@@ -72,5 +77,8 @@
     </footer>
     
     {% block scripts %}{% endblock %}
+
+    {% block body_end %}{% endblock %}
+
 </body>
 </html>

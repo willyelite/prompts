@@ -12,6 +12,9 @@ from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
 from flask_session import Session
 from flask_migrate import Migrate
+from functools import wraps
+from datetime import datetime
+from sqlalchemy import desc
 
 # --- CONFIGURAÇÃO ---
 load_dotenv()
@@ -92,6 +95,16 @@ class LoginForm(FlaskForm):
     password = PasswordField('Senha', validators=[DataRequired()])
     submit = SubmitField('Entrar')
 
+# Em app.py, adicione este novo modelo
+
+class GeneratedPrompt(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    prompt_text = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    # Relaciona o prompt ao usuário que o gerou (opcional, mas útil)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    user = db.relationship('User', backref=db.backref('generated_prompts', lazy=True))
+
 with app.app_context():
     db.create_all()
 
@@ -105,10 +118,10 @@ def login():
         if user and bcrypt.check_password_hash(user.password_hash, form.password.data):
             login_user(user, remember=True)
             redirect_target = request.form.get('redirect_choice')
-            if redirect_target == 'biblioteca':
-                return redirect(url_for('biblioteca'))
-            else:
+            if redirect_target == 'oficina':
                 return redirect(url_for('oficina'))
+            else:
+                return redirect(url_for('biblioteca'))
         else:
             flash('Login falhou. Verifique o email e a senha.', 'danger')
     return render_template('login.html', form=form)
@@ -144,7 +157,7 @@ def goodbye():
 @login_required
 def home():
     session.clear()
-    return redirect(url_for('oficina'))
+    return redirect(url_for('biblioteca'))
 
 @app.route('/oficina', methods=['GET', 'POST'])
 @login_required
@@ -184,9 +197,84 @@ def resumo():
         "scenario": session.get('scenario', {})
     }
     return render_template('resumo.html', server_data=server_data)
+    
+
+# --- NOVA SEÇÃO DE ADMIN ---
+
+# Defina aqui o e-mail que terá acesso de administrador
+ADMIN_EMAIL = "123@456.com"
+
+# Este é o nosso "filtro" customizado
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.email != ADMIN_EMAIL:
+            flash('Você não tem permissão para acessar esta página.', 'danger')
+            return redirect(url_for('biblioteca'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Esta é a nossa nova página de admin
+# Em app.py, na sua seção de Admin
+
+@app.route('/admin')
+@login_required
+@admin_required
+def admin_page():
+    # Faz a contagem de todos os modelos importantes
+    user_count = User.query.count()
+    project_count = Project.query.count()
+    character_count = SavedCharacter.query.count()
+    scenario_count = SavedScenario.query.count()
+    prompt_count = GeneratedPrompt.query.count()
+    
+    # Envia todos os contadores para o template
+    return render_template('admin.html', 
+                           user_count=user_count, 
+                           project_count=project_count,
+                           character_count=character_count,
+                           scenario_count=scenario_count,
+                           prompt_count=prompt_count)
+# Adicione esta rota na sua seção de admin em app.py
+
+@app.route('/admin/users')
+@login_required
+@admin_required
+def list_users_page():
+    all_users = User.query.order_by(User.id).all()
+    return render_template('user_list.html', users=all_users)
+
+# Adicione estas rotas na sua seção de admin em app.py
+
+@app.route('/admin/prompts')
+@login_required
+@admin_required
+def admin_prompts_page():
+    # Busca todos os prompts, do mais novo para o mais antigo
+    all_prompts = GeneratedPrompt.query.order_by(desc(GeneratedPrompt.created_at)).all()
+    return render_template('admin_prompts.html', prompts=all_prompts)
+
+@app.route('/admin/prompt/<int:prompt_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_generated_prompt(prompt_id):
+    prompt_to_delete = db.session.get(GeneratedPrompt, prompt_id)
+    if not prompt_to_delete:
+        return jsonify({'success': False, 'message': 'Prompt não encontrado.'}), 404
+    
+    try:
+        db.session.delete(prompt_to_delete)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Prompt apagado com sucesso.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro no servidor: {e}'}), 500
+
+# --- FIM DA SEÇÃO DE ADMIN ---
 
 
-# --- ROTAS DA BIBLIOTECA E PROJETOS (Grandes Mudanças) ---
+# --- ROTAS DA BIBLIOTECA E PROJETOS ---
+# ... (o resto do seu código continua aqui)
 
 @app.route('/biblioteca')
 @login_required
@@ -229,10 +317,27 @@ def create_project():
 
 # Em app.py, adicione esta rota no lugar da start_from_project
 
+# Em app.py
+
 @app.route('/biblioteca/carregar', methods=['POST'])
 @login_required
 def carregar_da_biblioteca():
     session.clear()
+    
+    # Pega o ID do projeto do formulário (a mudança principal está aqui)
+    project_id = request.form.get('project_id')
+    project = db.session.get(Project, project_id)
+
+    # Validação de segurança: o projeto existe e pertence ao usuário?
+    if not project or project.user_id != current_user.id:
+        flash('Projeto não encontrado ou não autorizado.', 'danger')
+        return redirect(url_for('biblioteca'))
+
+    # Salva o projeto na sessão IMEDIATAMENTE.
+    session['current_project_id'] = project.id
+    session['current_project_name'] = project.name
+    
+    # Agora, carrega os itens selecionados (se houver algum)
     char_ids = request.form.getlist('character_ids')
     scen_id = request.form.get('scenario_id')
     
@@ -240,8 +345,7 @@ def carregar_da_biblioteca():
     if char_ids:
         characters_from_db = db.session.query(SavedCharacter).filter(SavedCharacter.id.in_(char_ids)).all()
         for i, char_db in enumerate(characters_from_db):
-            # Validação de segurança: o usuário é dono do projeto deste personagem?
-            if char_db.project.user_id == current_user.id:
+            if char_db.project.user_id == current_user.id: # Dupla verificação
                 loaded_characters.append({
                     'id': i + 1, 'name': char_db.name,
                     'concept': char_db.concept, 'description': char_db.description
@@ -250,25 +354,16 @@ def carregar_da_biblioteca():
     loaded_scenario = {}
     if scen_id:
         scenario_from_db = db.session.get(SavedScenario, int(scen_id))
-        # Validação de segurança: o usuário é dono do projeto deste cenário?
-        if scenario_from_db and scenario_from_db.project.user_id == current_user.id:
+        if scenario_from_db and scenario_from_db.project.user_id == current_user.id: # Dupla verificação
             loaded_scenario = {
                 'name': scenario_from_db.name,
                 'description': scenario_from_db.description
             }
             
-    if not loaded_characters and not loaded_scenario:
-        flash('Selecione pelo menos um componente para carregar.', 'danger')
-        return redirect(url_for('biblioteca'))
-
     session['characters'] = loaded_characters
     session['scenario'] = loaded_scenario
-    # Guarda o projeto de onde os itens vieram, para saber onde salvar depois
-    if loaded_characters:
-         session['current_project_id'] = loaded_characters[0]['project_id'] = characters_from_db[0].project_id
-    elif loaded_scenario:
-         session['current_project_id'] = loaded_scenario['project_id'] = scenario_from_db.project_id
 
+    # Redireciona para a oficina, que agora pode estar vazia ou preenchida
     return redirect(url_for('oficina'))
 
 
@@ -322,6 +417,47 @@ def copy_character(character_id, project_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro no servidor: {e}'}), 500
+        
+        # Adicione esta nova rota em app.py
+
+@app.route('/component/<string:component_type>/<int:component_id>/edit', methods=['POST'])
+@login_required
+def edit_component(component_type, component_id):
+    try:
+        data = request.get_json()
+        new_name = data.get('name')
+        new_description = data.get('description')
+
+        if not new_name or not new_description:
+            return jsonify({'success': False, 'message': 'Nome e descrição não podem ser vazios.'}), 400
+
+        component = None
+        if component_type == 'character':
+            component = db.session.get(SavedCharacter, component_id)
+        elif component_type == 'scenario':
+            component = db.session.get(SavedScenario, component_id)
+        else:
+            return jsonify({'success': False, 'message': 'Tipo de componente inválido.'}), 400
+
+        if not component or component.project.user_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Componente não encontrado ou não autorizado.'}), 404
+
+        component.name = new_name
+        # Atualiza ambos os campos para consistência
+        component.description = new_description
+        component.concept = new_description 
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Componente atualizado com sucesso!',
+            'newName': new_name
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro no servidor: {e}'}), 500
 
 # --- FUNÇÕES E ROTA DE IA ---
 
@@ -368,7 +504,6 @@ def generate_ia_content(instruction):
     except Exception as e:
         return f"Erro na IA: {e}"
 
-
 # Em app.py
 
 @app.route('/montar-prompt', methods=['POST'])
@@ -379,15 +514,24 @@ def montar_prompt():
     scenario = data.get('scenario', {})
     details = data.get('details', {})
     
-    # <<< INÍCIO DA LÓGICA DO SOTAQUE >>>
     language = details.get('language', 'English')
     accent = details.get('accent')
-    language_instruction = language  # Começa com o idioma base
+    
+    language_map = {
+        'Português (Brasil)': 'Portuguese (Brazil)',
+        'Inglês': 'English',
+        'Espanhol': 'Spanish',
+        'Francês': 'French',
+        'Alemão': 'German',
+        'Japonês': 'Japanese',
+        'Italiano': 'Italian',
+        'Coreano': 'Korean',
+        'Mandarim': 'Mandarin'
+    }
+    english_language_instruction = language_map.get(language, 'English')
 
-    # Adiciona a instrução de sotaque apenas se for Português e um sotaque for escolhido
     if language == 'Português (Brasil)' and accent and accent not in ['Neutro Brasileiro', '']:
-        language_instruction = f"Português (Brasil) com sotaque '{accent}'"
-    # <<< FIM DA LÓGICA DO SOTAQUE >>>
+        english_language_instruction += f" with a '{accent}' accent"
 
     character_concepts = "\n".join([f"- Character Concept for '{c.get('name')}': {c.get('description')}" for c in characters])
     scenario_concept = f"- Scenario Concept for '{scenario.get('name')}': {scenario.get('description')}"
@@ -397,7 +541,10 @@ def montar_prompt():
       for d in details.get('dialogues', []):
           char_name = next((c['name'] for c in characters if str(c['id']) == str(d.get('charId'))), "Character")
           dialogue_lines_pt_br.append(f"- {char_name}: \"{d.get('text')}\"")
+          
+    safe_scenario_name = scenario.get('name', 'default').replace(' ', '_')
 
+    # A principal mudança está aqui, no texto do prompt final
     final_assembly_instruction = f"""
     You are a professional prompt engineer. Your only task is to generate a complete video prompt by precisely following the structure and rules below.
     
@@ -409,7 +556,7 @@ def montar_prompt():
       {character_concepts}
     Scenario Concept:
       {scenario_concept}
-    Dialogue Sequence (to be translated to {language_instruction}):
+    Dialogue Sequence (to be translated to {english_language_instruction}):
       {"\n".join(dialogue_lines_pt_br) if dialogue_lines_pt_br else "No dialogue provided."}
 
     **GENERATION TASK - Follow this structure EXACTLY:**
@@ -417,32 +564,53 @@ def montar_prompt():
     Prompt Title:
     [Generate a 1-3 word title in ENGLISH based on the Action Context]
     Initial AI Instructions:
-    Visual Style: {details.get('visual_style')} Camera Style: {details.get('camera_style')} Language: {language_instruction} with perfect lip-sync.
+    Visual Style: {details.get('visual_style')} Camera Style: {details.get('camera_style')} Language: {english_language_instruction} with perfect lip-sync.
     {"\n---\n\n".join([f'''👤 Character Profile: {c.get('name')}
     <char_{c.get('name').replace(' ', '_')}_start>
-    [Expand the character concept to '{c.get('name')}' Gender: [Character's gender] Age: [Character's age] Ethnicity: [Character's ethnicity] Skin Tone: [Detailed skin color and undertone] Body: [Height, build (e.g., ectomorph), posture, and proportions] Face: [Overall shape, cheekbones, jawline, and chin details] Eyes: [Color, shape, eyebrows, and eyelashes] Nose: [Bridge, nostrils, and tip shape] Mouth: [Lip shape, size, and notable details like Cupid's bow] Hair: [Color, texture, curl type (e.g., 4B), length, and default style] Facial Hair: [Describe beard/mustache, if any] Unique Features: [List all distinctive scars, moles, tattoos, piercings, etc.]
-    </char_{c.get('name').replace(' ', '_')}_end>
-    Attire: [Describe what this character is wearing in this specific scene.] Posture: [Describe their posture in this scene (e.g., leaning forward, arms crossed).] Facial Expression: [Describe their facial expression in this scene (e.g., a faint smile, a worried frown).]
+[Based on the core concept '{c.get('description')}', expand the character details below. The core concept is non-negotiable.
+*Archetype/Celebrity Look:* [Describe a mix of 2-3 real celebrities or well-known archetypes that define the character's face and build. Be specific, e.g., "Face like a young Mads Mikkelsen, body of a lean marathon runner", "Look of Eva Green mixed with Cate Blanchett". This is the most important anchor for consistency.]
+*Physical Details:*
+[Character's gender], [Apparent age, e.g., early 30s], [Character's ethnicity], [Height in meters, and body type like 'ectomorph', 'mesomorph', 'endomorph', 'lean', 'muscular'],Skin Tone [Detailed skin color, e.g., 'pale with cool undertones', 'olive skin', 'deep brown with warm undertones'].
+Face [e.g., Oval, Round, Square, Heart-shaped], [e.g., Sharp jawline, soft chin; Defined jawline, square chin], Cheekbones [e.g., High and prominent, subtle] Forehead [e.g., Broad, narrow].
+Eyes Color [e.g., Dark Brown, Ice Blue, Emerald Green], Shape [e.g., Almond, Hooded, Round, Downturned], Eyebrows [e.g., Thick and straight, thin and arched].
+Nose Shape [e.g., Straight, Roman, snub, aquiline].
+Mouth Lip Shape [e.g., Full lips, thin lips, defined Cupid's bow].
+Hair Color [e.g., Jet Black, Platinum Blonde, Auburn, Salt-and-pepper], [e.g., 'Fine and straight, styled in a bob cut', 'Thick 4C curls in a high puff', 'Wavy and shoulder-length']
+[List all unique and non-negotiable features like scars over an eye, specific tattoos on neck or face, piercings, etc. Be precise.]
+</char_{c.get('name').replace(' ', '_')}_end>
+Attire: [Describe what this character is wearing in this specific scene.] Posture: [Describe their posture in this scene (e.g., leaning forward, arms crossed).] Facial Expression: [Describe their facial expression in this scene (e.g., a faint smile, a worried frown).]
 ''' for c in characters])}
-    Scene Breakdown
-    Scene 01 (0.0s – 4.0s):
-    Action: [Describe what the characters are doing, ensuring the action is directly inspired by the "Action Context".]
-    Dialogue ({language_instruction}): [Translate the first dialogue line and attribute it in the format: Character Name says "Translated text.".]
-    Camera: [Describe a camera movement and framing for this scene.]
-    Cinematography: [Describe a technical detail for this scene.]
-    Scene 02 (4.0s – 8.0s):
-    Action: [Describe the continuing action for this scene.]
-    Dialogue ({language_instruction}): [Translate the second dialogue line and attribute it.]
-    Camera: [Describe a camera movement and framing for this scene.]
-    Cinematography: [Describe a technical detail for this scene.]
+    
+    Scene Breakdown:
+    [Your task is to create a scene breakdown based on the provided dialogue and action context.
+    - The total duration of all scenes combined MUST be exactly 8 seconds.
+    - Based on the user's data, decide if the story is better told in ONE or TWO scenes.
+    - Allocate the 8 seconds appropriately between the scenes you create. For example, one 8-second scene, or a 5s and a 3s scene.
+    - For each scene you create, you MUST provide all the following fields: Scene number with your calculated timing, Action, Dialogue, Camera, and Cinematography.
+    - For the Dialogue field, if the target language is Portuguese, use the original dialogue. If it is another language, translate the dialogue. Use the provided lines in order. If there is only one dialogue line, you can create one long scene or two scenes where only the first has dialogue.]
+
     Scene Setup:
-    <scen_{scenario.get('name', 'default').replace(' ', '_')}_start>
+    <scen_{safe_scenario_name}_start>
     Location: [Expand the Scenario Concept into a detailed description of the location.] Lighting: [Describe the lighting of the scene.] Atmosphere: [Describe the atmosphere, sounds, and smells.]
-    </scen_{scenario.get('name', 'default').replace(' ', '_')}_end>
+    </scen_{safe_scenario_name}_end>
     Instructions Final for IA:
-    Visual Style: {details.get('visual_style')} Color Grading: [Describe a color grading style.] Duration: 8 seconds. Language: {language_instruction} with perfect lip-sync. Audio: [Describe the audio mix.] Output: No watermarks, no subtitles.
+    Visual Style: {details.get('visual_style')} Color Grading: [Describe a color grading style.] Duration: 8 seconds. Language: {english_language_instruction} with perfect lip-sync. Audio: [Describe the audio mix.] Output: No watermarks, no subtitles.
     """
     final_prompt = generate_ia_content(final_assembly_instruction)
+    # --- NOVO CÓDIGO PARA SALVAR O PROMPT ---
+    if final_prompt and not final_prompt.startswith("Erro"):
+        try:
+            new_prompt_log = GeneratedPrompt(
+                prompt_text=final_prompt,
+                user_id=current_user.id
+            )
+            db.session.add(new_prompt_log)
+            db.session.commit()
+        except Exception as e:
+            # Se o salvamento falhar, não quebra a aplicação, apenas registra no log do servidor
+            print(f"Erro ao salvar log de prompt: {e}")
+            db.session.rollback()
+    # --- FIM DO NOVO CÓDIGO ---
     return jsonify({'prompt': final_prompt})
 
 
@@ -571,6 +739,35 @@ def seed_default_project_command():
     except Exception as e:
         db.session.rollback()
         print(f"Ocorreu um erro: {e}")
+        
+# Em app.py, substitua a função que você acabou de adicionar por esta:
+
+@app.cli.command("list-users")
+def list_users_command():
+    """Lista todos os usuários e seus respectivos projetos."""
+    try:
+        users = User.query.order_by(User.id).all()
+        
+        if not users:
+            print("Nenhum usuário encontrado.")
+            return
+        
+        print("\n--- Lista de Usuários e Projetos ---")
+        for user in users:
+            print(f"\n[+] ID: {user.id}, Email: {user.email}")
+            if user.projects:
+                for project in user.projects:
+                    # Acessando os projetos relacionados ao usuário
+                    print(f"    - Projeto ID: {project.id}, Nome: '{project.name}'")
+            else:
+                print("    - (Nenhum projeto encontrado)")
+        
+        print("------------------------------------")
+        print(f"\nTotal de usuários: {len(users)}\n")
+
+    except Exception as e:
+        print(f"Ocorreu um erro ao buscar os usuários: {e}")
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

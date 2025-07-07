@@ -1,0 +1,87 @@
+{% extends "layout.html" %}
+
+{% block title %}Painel Administrativo{% endblock %}
+
+{% block content %}
+<style>
+    .admin-panel {
+        background-color: var(--surface-color);
+        padding: 2rem;
+        border-radius: 12px;
+    }
+    .admin-panel h1 {
+        color: var(--primary-color);
+        margin-top: 0;
+        border-bottom: 2px solid var(--border-color);
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    .stat-card {
+        background-color: var(--bg-color);
+        padding: 1.5rem;
+        border-radius: 8px;
+        text-align: center;
+        border: 1px solid var(--border-color);
+    }
+    .stat-card h2 {
+        margin: 0 0 0.5rem 0;
+        font-size: 2.5rem;
+        color: var(--text-color);
+    }
+    .stat-card p {
+        margin: 0;
+        color: #aeb9c5;
+        font-size: 1.1rem;
+    }
+    .admin-links a {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: var(--primary-color);
+        text-decoration: none;
+        font-weight: 500;
+    }
+    .admin-links a:hover {
+        text-decoration: underline;
+    }
+</style>
+
+<div class="admin-panel">
+    <h1>Painel Administrativo</h1>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h2>{{ user_count }}</h2>
+            <p>Usuários Registrados</p>
+        </div>
+        <div class="stat-card">
+            <h2>{{ project_count }}</h2>
+            <p>Projetos Criados</p>
+        </div>
+        <div class="stat-card">
+            <h2>{{ character_count }}</h2>
+            <p>Personagens Salvos</p>
+        </div>
+        <div class="stat-card">
+            <h2>{{ scenario_count }}</h2>
+            <p>Cenários Salvos</p>
+        </div>
+        <div class="stat-card">
+            <h2>{{ prompt_count }}</h2>
+            <p>Total de Prompts Gerados</p>
+        </div>
+    </div>
+
+    <hr style="border-color: var(--border-color); margin: 2rem 0;">
+
+    <div class="admin-links">
+        <p><a href="{{ url_for('list_users_page') }}">Ver Lista Detalhada de Usuários</a></p>
+        <p><a href="{{ url_for('admin_prompts_page') }}">Ver Log de Todos os Prompts</a></p>
+    </div>
+</div>
+{% endblock %}

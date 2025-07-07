@@ -4,58 +4,62 @@
 
 {% block head_styles %}
 <style>
+    /* Estilos Gerais (sem alterações) */
     h1 { text-align: center; color: var(--text-color); font-weight: 700; margin-bottom: 0.5rem; }
     h1 span { color: var(--primary-color); }
     h2 { margin-top: 2.5rem; color: var(--primary-color); opacity: 0.9; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1.5rem; font-size: 1.5rem; }
-    
-    /* Seção para criar novo projeto */
-    .new-project-section {
-        background-color: var(--surface-color);
-        padding: 1.5rem;
-        border-radius: 12px;
-        margin-bottom: 2rem;
-    }
+    .new-project-section { background-color: var(--surface-color); padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; }
     .new-project-section form { display: flex; gap: 1rem; align-items: center; }
     .new-project-section input { flex-grow: 1; background-color: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-size: 1rem; }
     .main-button { padding: 12px 20px; background-color: var(--success-color); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; }
-
-    /* Estilo para os cards de projeto */
-    .project-card {
-        background-color: var(--surface-color);
-        border: 1px solid var(--border-color);
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-    }
+    .project-card { background-color: var(--surface-color); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
     .project-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
     .project-header h3 { color: var(--text-color); margin: 0; font-size: 1.4rem; }
     .start-button { text-decoration: none; padding: 12px 25px; background-color: var(--primary-color); color: var(--button-text-dark); border-radius: 8px; font-weight: 700; transition: all 0.2s ease; cursor: pointer; border: none;}
     .start-button:hover { transform: scale(1.05); }
-
-    .asset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem; }
+    .asset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
     .asset-column h4 { margin-top: 0; color: #aeb9c5; }
     .asset-list-item { display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-color); padding: 0.5rem 1rem; border-radius: 6px; margin-bottom: 0.5rem; }
-    
+    .asset-selectable label { display: flex; align-items: center; cursor: pointer; width: 100%; padding: 0.25rem 0; }
+    .asset-selectable input { margin-right: 10px; width: 18px; height: 18px; }
+
     /* Botões de Ação */
-    .copy-btn { font-size: 0.8rem; padding: 5px 10px; background-color: transparent; border: 1px solid var(--info-color); color: var(--info-color); border-radius: 5px; cursor: pointer; transition: all 0.2s; margin-right: 5px; }
-    .copy-btn:hover { background-color: var(--info-color); color: white; }
-    .delete-btn { font-size: 0.8rem; padding: 5px 10px; background-color: transparent; border: 1px solid var(--danger-color); color: var(--danger-color); border-radius: 5px; cursor: pointer; transition: all 0.2s; }
-    .delete-btn:hover { background-color: var(--danger-color); color: white; }
+    .action-btn { font-size: 0.8rem; padding: 5px 10px; background-color: transparent; border: 1px solid; border-radius: 5px; cursor: pointer; transition: all 0.2s; margin-left: 5px; }
+    .action-btn:hover { color: white; }
+    .copy-btn { border-color: var(--info-color); color: var(--info-color); }
+    .copy-btn:hover { background-color: var(--info-color); }
+    .delete-btn { border-color: var(--danger-color); color: var(--danger-color); }
+    .delete-btn:hover { background-color: var(--danger-color); }
+    .edit-btn { border-color: var(--success-color); color: var(--success-color); }
+    .edit-btn:hover { background-color: var(--success-color); }
 
-    /* Itens Selecionáveis */
-    .asset-selectable label {
-        display: flex;
-        align-items: center;
-        cursor: pointer;
-        width: 100%;
-        padding: 0.25rem 0;
-    }
-    .asset-selectable input {
-        margin-right: 10px;
-        width: 18px;
-        height: 18px;
-    }
+    /* Estilos para Expandir/Minimizar */
+    .project-toggle-header { cursor: pointer; user-select: none; }
+    .project-card .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.4s ease-out; border-top: 1px solid transparent; margin-top: 0; padding-top: 0; }
+    .project-card.expanded .collapsible-content { max-height: 1500px; transition: max-height 0.5s ease-in; border-top: 1px solid var(--border-color); margin-top: 1.5rem; padding-top: 1.5rem; }
 
+    /* Estilos para o Modal de Edição */
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7); backdrop-filter: blur(5px);
+        display: none; justify-content: center; align-items: center; z-index: 2000;
+    }
+    .modal-content {
+        background-color: var(--surface-color); color: var(--text-color);
+        padding: 2rem; border-radius: 12px; width: 90%; max-width: 600px;
+        border: 1px solid var(--border-color);
+    }
+    .modal-content h3 { margin-top: 0; color: var(--primary-color); }
+    .modal-content .form-group { margin-bottom: 1rem; }
+    .modal-content label { display: block; margin-bottom: 0.5rem; }
+    .modal-content input, .modal-content textarea {
+        width: 100%; box-sizing: border-box; background-color: var(--bg-color);
+        color: var(--text-color); border: 1px solid var(--border-color);
+        border-radius: 8px; padding: 12px; font-size: 1rem;
+    }
+    .modal-content textarea { resize: vertical; min-height: 120px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
+    .modal-actions .cancel-btn { background-color: var(--border-color); }
 </style>
 {% endblock %}
 
@@ -73,104 +77,186 @@
 
     {% for project in projects %}
     <div class="project-card" id="project-card-{{ project.id }}">
-        
-        <form action="{{ url_for('carregar_da_biblioteca') }}" method="POST">
-            <div class="project-header">
-                <h3>{{ project.name }}</h3>
-                <button type="submit" class="start-button">Carregar Seleção e Iniciar &rarr;</button>
-            </div>
-            <div class="asset-grid">
-                <div class="asset-column">
-                    <h4>Personagens (Selecione um ou mais)</h4>
-                    {% for char in project.characters_list %}
-                        <div class="asset-list-item asset-selectable" id="char-card-{{ char.id }}">
-                            <label>
-                                <input type="checkbox" name="character_ids" value="{{ char.id }}">
-                                {{ char.name }}
-                            </label>
-                            <div>
-                                <button type="button" class="copy-btn" onclick="copyCharacter({{ char.id }}, '{{ char.name | e }}')">Copiar</button>
-                                <button type="button" class="delete-btn" onclick="deleteAsset('character', {{ char.id }})">&times; Apagar</button>
+        <div class="project-header project-toggle-header">
+            <h3>{{ project.name }}</h3>
+        </div>
+        <div class="collapsible-content">
+            <form action="{{ url_for('carregar_da_biblioteca') }}" method="POST">
+                <input type="hidden" name="project_id" value="{{ project.id }}">
+                <div class="asset-grid">
+                    <div class="asset-column">
+                        <h4>Personagens</h4>
+                        {% for char in project.characters_list %}
+                            <div class="asset-list-item" id="char-item-{{ char.id }}">
+                                <label>
+                                    <input type="checkbox" name="character_ids" value="{{ char.id }}">
+                                    <span class="component-name">{{ char.name }}</span>
+                                    <span class="component-desc" style="display: none;">{{ char.description }}</span>
+                                </label>
+                                <div>
+                                    <button type="button" class="action-btn edit-btn" onclick="openEditModal('character', {{ char.id }})">Editar</button>
+                                    <button type="button" class="action-btn copy-btn" onclick="copyCharacter({{ char.id }}, '{{ char.name | e }}')">Copiar</button>
+                                    <button type="button" class="action-btn delete-btn" onclick="deleteAsset('character', {{ char.id }})">Apagar</button>
+                                </div>
                             </div>
-                        </div>
-                    {% else %}
-                        <p style="color: #6c757d;">Nenhum personagem.</p>
-                    {% endfor %}
+                        {% else %}<p style="color: #6c757d;">Nenhum personagem.</p>{% endfor %}
+                    </div>
+                    <div class="asset-column">
+                        <h4>Cenários</h4>
+                        {% for scen in project.scenarios_list %}
+                             <div class="asset-list-item" id="scen-item-{{ scen.id }}">
+                                <label>
+                                    <input type="radio" name="scenario_id" value="{{ scen.id }}">
+                                    <span class="component-name">{{ scen.name }}</span>
+                                    <span class="component-desc" style="display: none;">{{ scen.description }}</span>
+                                </label>
+                                <div>
+                                    <button type="button" class="action-btn edit-btn" onclick="openEditModal('scenario', {{ scen.id }})">Editar</button>
+                                    <button type="button" class="action-btn delete-btn" onclick="deleteAsset('scenario', {{ scen.id }})">Apagar</button>
+                                </div>
+                            </div>
+                        {% else %}<p style="color: #6c757d;">Nenhum cenário.</p>{% endfor %}
+                    </div>
                 </div>
-                <div class="asset-column">
-                    <h4>Cenários (Selecione um)</h4>
-                    {% for scen in project.scenarios_list %}
-                         <div class="asset-list-item asset-selectable" id="scen-card-{{ scen.id }}">
-                            <label>
-                                <input type="radio" name="scenario_id" value="{{ scen.id }}">
-                                {{ scen.name }}
-                            </label>
-                            <button type="button" class="delete-btn" onclick="deleteAsset('scenario', {{ scen.id }})">&times; Apagar</button>
-                        </div>
-                    {% else %}
-                        <p style="color: #6c757d;">Nenhum cenário.</p>
-                    {% endfor %}
-                </div>
-            </div>
-        </form>
-
+                <button type="submit" class="start-button" style="margin-top: 1.5rem;">Carregar Seleção e Iniciar &rarr;</button>
+            </form>
+        </div>
     </div>
     {% else %}
     <p>Você ainda não tem nenhum projeto. Crie um acima para começar!</p>
     {% endfor %}
 
+    <div id="edit-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Editar Componente</h3>
+            <div class="form-group">
+                <label for="edit-name">Nome</label>
+                <input type="text" id="edit-name">
+            </div>
+            <div class="form-group">
+                <label for="edit-description">Descrição (Conceito)</label>
+                <textarea id="edit-description" rows="5"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="main-button cancel-btn" onclick="closeEditModal()">Cancelar</button>
+                <button type="button" class="main-button" onclick="saveChanges()">Salvar Alterações</button>
+            </div>
+        </div>
+    </div>
 {% endblock %}
+
 
 {% block scripts %}
 <script>
-    const allProjects = {{ projects_for_js|tojson|safe }};
+    // Executa todo o nosso código apenas quando o HTML da página estiver completamente carregado.
+    document.addEventListener('DOMContentLoaded', function() {
+        
+        // --- Constantes Globais do Script ---
+        const allProjects = {{ projects_for_js|tojson|safe }};
+        const editModal = document.getElementById('edit-modal');
+        const editNameInput = document.getElementById('edit-name');
+        const editDescTextarea = document.getElementById('edit-description');
 
+        // --- Funções de Controle do Modal ---
+        function openEditModal(type, id) {
+            const itemElement = document.getElementById(`${type.slice(0,4)}-item-${id}`);
+            if (!itemElement) {
+                console.error('Elemento do item não encontrado:', `${type.slice(0,4)}-item-${id}`);
+                return;
+            }
+            
+            const currentName = itemElement.querySelector('.component-name').innerText;
+            const currentDesc = itemElement.querySelector('.component-desc').innerText;
+            
+            editNameInput.value = currentName;
+            editDescTextarea.value = currentDesc;
+
+            editModal.dataset.type = type;
+            editModal.dataset.id = id;
+            editModal.style.display = 'flex';
+        }
+
+        function closeEditModal() {
+            editModal.style.display = 'none';
+        }
+
+        async function saveChanges() {
+            const type = editModal.dataset.type;
+            const id = editModal.dataset.id;
+            const newName = editNameInput.value;
+            const newDesc = editDescTextarea.value;
+
+            try {
+                const response = await fetch(`/component/${type}/${id}/edit`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ name: newName, description: newDesc })
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message || 'Erro do servidor.');
+
+                const itemElement = document.getElementById(`${type.slice(0,4)}-item-${id}`);
+                itemElement.querySelector('.component-name').innerText = data.newName;
+                itemElement.querySelector('.component-desc').innerText = newDesc;
+                
+                alert(data.message);
+                closeEditModal();
+            } catch (error) {
+                alert('Erro ao salvar: ' + error.message);
+            }
+        }
+
+        // --- Anexar Funções ao Objeto Window para o HTML Acessar ---
+        window.openEditModal = openEditModal;
+        window.closeEditModal = closeEditModal;
+        window.saveChanges = saveChanges;
+        window.deleteAsset = deleteAsset;
+        window.copyCharacter = copyCharacter;
+
+        // --- Event Listeners ---
+        document.querySelectorAll('.project-toggle-header').forEach(header => {
+            header.addEventListener('click', function(event) {
+                if (event.target.closest('.action-btn, button, a, input')) return;
+                this.closest('.project-card').classList.toggle('expanded');
+            });
+        });
+
+        window.addEventListener('click', function(event) {
+            if (event.target == editModal) {
+                closeEditModal();
+            }
+        });
+    });
+
+    // --- Funções Globais (podem ser chamadas pelo HTML) ---
     async function deleteAsset(assetType, assetId) {
         if (!confirm(`Tem certeza que deseja apagar este ${assetType === 'character' ? 'personagem' : 'cenário'}?`)) return;
-        
         try {
             const response = await fetch(`/delete_asset/${assetType}/${assetId}`, { method: 'POST' });
             const data = await response.json();
             if (data.success) {
-                const cardId = assetType === 'character' ? `char-card-${assetId}` : `scen-card-${assetId}`;
-                const cardElement = document.getElementById(cardId);
-                if (cardElement) cardElement.remove();
-            } else {
-                throw new Error(data.message);
-            }
-        } catch (error) {
-            alert('Erro ao apagar: ' + error.message);
-        }
+                const itemElement = document.getElementById(`${assetType.slice(0,4)}-item-${assetId}`);
+                if (itemElement) itemElement.remove();
+            } else { throw new Error(data.message); }
+        } catch (error) { alert('Erro ao apagar: ' + error.message); }
     }
 
     async function copyCharacter(characterId, characterName) {
+        const allProjects = {{ projects_for_js|tojson|safe }}; // Redefinido para garantir acesso
         const projectOptions = allProjects.map(p => `ID: ${p.id} - Nome: ${p.name}`).join('\n');
-        const destProjectId = prompt(
-            `Para qual projeto você quer copiar "${characterName}"?\n\nDigite o ID do projeto de destino:\n\n${projectOptions}`
-        );
-
-        if (!destProjectId) {
-            return;
-        }
-
+        const destProjectId = prompt(`Para qual projeto você quer copiar "${characterName}"?\n\nDigite o ID do projeto de destino:\n\n${projectOptions}`);
+        if (!destProjectId) { return; }
         if (isNaN(destProjectId) || destProjectId.trim() === '') {
             alert('Por favor, digite um ID numérico válido.');
             return;
         }
-
         try {
             const response = await fetch(`/character/${characterId}/copy_to/${destProjectId}`, { method: 'POST' });
             const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Erro do servidor.');
-            }
-            
+            if (!response.ok) { throw new Error(data.message || 'Erro do servidor.'); }
             alert(data.message);
             window.location.reload();
-        } catch (error) {
-            alert('Erro ao copiar: ' + error.message);
-        }
+        } catch (error) { alert('Erro ao copiar: ' + error.message); }
     }
 </script>
 {% endblock %}
