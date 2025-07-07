@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}Sua Biblioteca Criativa{% endblock %}
+{% block title %}Sua Biblioteca de Projetos{% endblock %}
 
 {% block head_styles %}
 <style>
@@ -8,139 +8,169 @@
     h1 span { color: var(--primary-color); }
     h2 { margin-top: 2.5rem; color: var(--primary-color); opacity: 0.9; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1.5rem; font-size: 1.5rem; }
     
-    .library-header { text-align: center; margin-bottom: 2.5rem; }
-    .library-header p { font-size: 1.1rem; color: #aeb9c5; margin-top: 0; }
-    .start-new-btn { display: inline-block; text-decoration: none; padding: 12px 25px; background-color: var(--surface-color); color: var(--primary-color); border: 1px solid var(--primary-color); border-radius: 8px; font-weight: 700; margin-top: 1rem; transition: all 0.2s ease; }
-    .start-new-btn:hover { background-color: var(--primary-color); color: var(--button-text-dark); }
+    /* Seção para criar novo projeto */
+    .new-project-section {
+        background-color: var(--surface-color);
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+    }
+    .new-project-section form { display: flex; gap: 1rem; align-items: center; }
+    .new-project-section input { flex-grow: 1; background-color: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-size: 1rem; }
+    .main-button { padding: 12px 20px; background-color: var(--success-color); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; }
 
-    .asset-list { 
-        display: grid; 
-        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); 
-        gap: 1rem; 
-    }
-    .asset-card { 
-        background-color: var(--surface-color); 
-        border-radius: 8px; 
+    /* Estilo para os cards de projeto */
+    .project-card {
+        background-color: var(--surface-color);
         border: 1px solid var(--border-color);
-        padding: 0.9rem; 
-        display: flex; 
-        flex-direction: column; 
-        justify-content: space-between; 
-        transition: border-color 0.2s ease;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
     }
-    .asset-card:has(input:checked) {
-        border-color: var(--primary-color);
-        box-shadow: 0 0 15px rgba(255, 193, 7, 0.2);
-    }
-    .asset-card-content h3 { 
-        border: none; 
-        margin: 0 0 0.5rem 0; 
-        font-size: 1.1rem; 
-        color: var(--text-color); 
-    }
-    .asset-card-content p { 
-        font-size: 0.85rem; 
-        color: #aeb9c5; 
-        margin: 0;
-        overflow: hidden; 
-        text-overflow: ellipsis; 
-        display: -webkit-box; 
-        -webkit-line-clamp: 2; 
-        -webkit-box-orient: vertical; 
-    }
-    .asset-selection { margin-bottom: 1rem; display: flex; align-items: center; cursor: pointer; }
-    .asset-selection input { margin-right: 0.75rem; width: 18px; height: 18px; }
-    .asset-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
-    .delete-btn { width: 100%; text-align: center; text-decoration: none; font-size: 0.9rem; padding: 8px 12px; border: 1px solid var(--danger-color); background-color: transparent; color: var(--danger-color); border-radius: 6px; font-weight: 700; cursor: pointer; transition: all 0.2s ease; }
+    .project-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+    .project-header h3 { color: var(--text-color); margin: 0; font-size: 1.4rem; }
+    .start-button { text-decoration: none; padding: 12px 25px; background-color: var(--primary-color); color: var(--button-text-dark); border-radius: 8px; font-weight: 700; transition: all 0.2s ease; cursor: pointer; border: none;}
+    .start-button:hover { transform: scale(1.05); }
+
+    .asset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem; }
+    .asset-column h4 { margin-top: 0; color: #aeb9c5; }
+    .asset-list-item { display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-color); padding: 0.5rem 1rem; border-radius: 6px; margin-bottom: 0.5rem; }
+    
+    /* Botões de Ação */
+    .copy-btn { font-size: 0.8rem; padding: 5px 10px; background-color: transparent; border: 1px solid var(--info-color); color: var(--info-color); border-radius: 5px; cursor: pointer; transition: all 0.2s; margin-right: 5px; }
+    .copy-btn:hover { background-color: var(--info-color); color: white; }
+    .delete-btn { font-size: 0.8rem; padding: 5px 10px; background-color: transparent; border: 1px solid var(--danger-color); color: var(--danger-color); border-radius: 5px; cursor: pointer; transition: all 0.2s; }
     .delete-btn:hover { background-color: var(--danger-color); color: white; }
 
-    .load-button-container { position: sticky; bottom: 0; background: linear-gradient(180deg, rgba(13, 27, 42, 0) 0%, rgba(13, 27, 42, 1) 40%); padding: 2rem 0 1rem 0; margin-top: 3rem; }
-    .main-button { width: 100%; padding: 15px; background-color: var(--success-color); color: white; border: none; border-radius: 8px; font-size: 1.2rem; font-weight: 700; cursor: pointer; }
+    /* Itens Selecionáveis */
+    .asset-selectable label {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        width: 100%;
+        padding: 0.25rem 0;
+    }
+    .asset-selectable input {
+        margin-right: 10px;
+        width: 18px;
+        height: 18px;
+    }
+
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="library-header">
-    <h1>Sua Biblioteca <span>Criativa</span></h1>
-    <p>Selecione os componentes que deseja usar e continue sua criação.</p>
-    <a href="{{ url_for('home') }}" class="start-new-btn">Ou Inicie uma Nova Criação do Zero</a>
-</div>
+    <h1>Biblioteca de <span>Projetos</span></h1>
+    
+    <div class="new-project-section">
+        <form action="{{ url_for('create_project') }}" method="POST">
+            <input type="text" name="project_name" placeholder="Nome do Novo Projeto" required>
+            <button type="submit" class="main-button">Criar Projeto</button>
+        </form>
+    </div>
 
-<form id="load-form" method="POST" action="{{ url_for('carregar_da_biblioteca') }}">
+    <h2>Seus Projetos</h2>
 
-    <h2>Personagens Salvos (Selecione um ou mais)</h2>
-    <div class="asset-list">
-        {% for char in characters %}
-        <div class="asset-card" id="char-card-{{ char.id }}">
-            <label class="asset-selection" for="char-check-{{ char.id }}">
-                <input type="checkbox" name="character_ids" value="{{ char.id }}" id="char-check-{{ char.id }}">
-                <div class="asset-card-content">
-                    <h3>{{ char.name }}</h3>
-                    <p title="{{ char.description }}">{{ char.description }}</p>
-                </div>
-            </label>
-            <div class="asset-actions">
-                <button type="button" onclick="deleteAsset('character', {{ char.id }})" class="delete-btn">Apagar</button>
+    {% for project in projects %}
+    <div class="project-card" id="project-card-{{ project.id }}">
+        
+        <form action="{{ url_for('carregar_da_biblioteca') }}" method="POST">
+            <div class="project-header">
+                <h3>{{ project.name }}</h3>
+                <button type="submit" class="start-button">Carregar Seleção e Iniciar &rarr;</button>
             </div>
-        </div>
-        {% else %}
-        <p>Você ainda não salvou nenhum personagem. Crie um na oficina e salve-o na tela de resumo.</p>
-        {% endfor %}
-    </div>
-
-    <h2>Cenário (Selecione um)</h2>
-    <div class="asset-list">
-        {% for scen in scenarios %}
-        <div class="asset-card" id="scen-card-{{ scen.id }}">
-            <label class="asset-selection" for="scen-radio-{{ scen.id }}">
-                <input type="radio" name="scenario_id" value="{{ scen.id }}" id="scen-radio-{{ scen.id }}">
-                <div class="asset-card-content">
-                    <!-- MUDANÇA AQUI: Trocado scen.concept por scen.name para exibir o nome correto -->
-                    <h3>{{ scen.name }}</h3>
-                    <p title="{{ scen.description }}">{{ scen.description }}</p>
+            <div class="asset-grid">
+                <div class="asset-column">
+                    <h4>Personagens (Selecione um ou mais)</h4>
+                    {% for char in project.characters_list %}
+                        <div class="asset-list-item asset-selectable" id="char-card-{{ char.id }}">
+                            <label>
+                                <input type="checkbox" name="character_ids" value="{{ char.id }}">
+                                {{ char.name }}
+                            </label>
+                            <div>
+                                <button type="button" class="copy-btn" onclick="copyCharacter({{ char.id }}, '{{ char.name | e }}')">Copiar</button>
+                                <button type="button" class="delete-btn" onclick="deleteAsset('character', {{ char.id }})">&times; Apagar</button>
+                            </div>
+                        </div>
+                    {% else %}
+                        <p style="color: #6c757d;">Nenhum personagem.</p>
+                    {% endfor %}
                 </div>
-            </label>
-            <div class="asset-actions">
-                <button type="button" onclick="deleteAsset('scenario', {{ scen.id }})" class="delete-btn">Apagar</button>
+                <div class="asset-column">
+                    <h4>Cenários (Selecione um)</h4>
+                    {% for scen in project.scenarios_list %}
+                         <div class="asset-list-item asset-selectable" id="scen-card-{{ scen.id }}">
+                            <label>
+                                <input type="radio" name="scenario_id" value="{{ scen.id }}">
+                                {{ scen.name }}
+                            </label>
+                            <button type="button" class="delete-btn" onclick="deleteAsset('scenario', {{ scen.id }})">&times; Apagar</button>
+                        </div>
+                    {% else %}
+                        <p style="color: #6c757d;">Nenhum cenário.</p>
+                    {% endfor %}
+                </div>
             </div>
-        </div>
-        {% else %}
-        <p>Você ainda não salvou nenhum cenário. Crie um na oficina e salve-o na tela de resumo.</p>
-        {% endfor %}
-    </div>
+        </form>
 
-    <div class="load-button-container">
-        <button type="submit" class="main-button">Carregar Selecionados e Continuar →</button>
     </div>
-</form>
+    {% else %}
+    <p>Você ainda não tem nenhum projeto. Crie um acima para começar!</p>
+    {% endfor %}
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-async function deleteAsset(assetType, assetId) {
-    // Usando um modal customizado em vez de confirm() seria ideal no futuro, mas por agora mantemos a simplicidade.
-    const confirmation = window.confirm(`Tem certeza que deseja apagar este ${assetType === 'character' ? 'personagem' : 'cenário'}? Esta ação não pode ser desfeita.`);
-    if (!confirmation) { return; }
-    try {
-        const response = await fetch(`/delete_asset/${assetType}/${assetId}`, { 
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        const data = await response.json();
-        if (data.success) {
-            const cardId = assetType === 'character' ? `char-card-${assetId}` : `scen-card-${assetId}`;
-            const cardElement = document.getElementById(cardId);
-            if (cardElement) {
-                cardElement.style.transition = 'opacity 0.5s';
-                cardElement.style.opacity = '0';
-                setTimeout(() => cardElement.remove(), 500);
+    const allProjects = {{ projects_for_js|tojson|safe }};
+
+    async function deleteAsset(assetType, assetId) {
+        if (!confirm(`Tem certeza que deseja apagar este ${assetType === 'character' ? 'personagem' : 'cenário'}?`)) return;
+        
+        try {
+            const response = await fetch(`/delete_asset/${assetType}/${assetId}`, { method: 'POST' });
+            const data = await response.json();
+            if (data.success) {
+                const cardId = assetType === 'character' ? `char-card-${assetId}` : `scen-card-${assetId}`;
+                const cardElement = document.getElementById(cardId);
+                if (cardElement) cardElement.remove();
+            } else {
+                throw new Error(data.message);
             }
-        } else {
-            throw new Error(data.message);
+        } catch (error) {
+            alert('Erro ao apagar: ' + error.message);
         }
-    } catch (error) {
-        alert('Erro ao apagar o ativo: ' + error.message);
     }
-}
+
+    async function copyCharacter(characterId, characterName) {
+        const projectOptions = allProjects.map(p => `ID: ${p.id} - Nome: ${p.name}`).join('\n');
+        const destProjectId = prompt(
+            `Para qual projeto você quer copiar "${characterName}"?\n\nDigite o ID do projeto de destino:\n\n${projectOptions}`
+        );
+
+        if (!destProjectId) {
+            return;
+        }
+
+        if (isNaN(destProjectId) || destProjectId.trim() === '') {
+            alert('Por favor, digite um ID numérico válido.');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/character/${characterId}/copy_to/${destProjectId}`, { method: 'POST' });
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Erro do servidor.');
+            }
+            
+            alert(data.message);
+            window.location.reload();
+        } catch (error) {
+            alert('Erro ao copiar: ' + error.message);
+        }
+    }
 </script>
 {% endblock %}

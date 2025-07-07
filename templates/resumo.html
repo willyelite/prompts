@@ -33,7 +33,21 @@
         transition: background-color 0.2s ease;
     }
     .save-component-btn:hover {
-        background-color: #0aa2c0; /* Cor um pouco mais clara para o hover */
+        background-color: #0aa2c0;
+    }
+    /* Estilo para o botão de cópia no rodapé */
+    .copy-button-footer {
+        display: block;
+        width: fit-content;
+        margin-left: auto; /* Alinha o botão à direita */
+        margin-top: 1rem; /* Adiciona um espaço acima do botão */
+        background-color: var(--primary-color);
+        color: var(--button-text-dark);
+        border: none;
+        border-radius: 5px;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-weight: 500;
     }
 </style>
 {% endblock %}
@@ -42,38 +56,35 @@
     <h1>Resumo e <span>Geração Final</span></h1>
     <p style="text-align: center; margin-top: -1.5rem; color: #aeb9c5;">Etapa 3 de 3: Revise os componentes e gere o prompt final.</p>
 
-    <!-- MUDANÇA: Seção de resumo agora é um único bloco de conferência -->
     <div class="summary-section">
         <h2>Resumo para Conferência</h2>
         <div class="summary-grid">
-            <div class="summary-item"><strong>Personagens:</strong> <span class="text-white">{{ session.get('characters', [])|map(attribute='name')|join(', ') }}</span></div>
-            <div class="summary-item"><strong>Cenário:</strong> <span class="text-white">{{ session.get('scenario', {}).get('name', 'N/A') }}</span></div>
-            <div class="summary-item"><strong>Contexto da Ação:</strong> <span class="text-white">{{ session.get('details', {}).get('action_context', 'N/A') }}</span></div>
+            <div class="summary-item"><strong>Personagens:</strong> <span class="text-white">{{ server_data.characters|map(attribute='name')|join(', ') }}</span></div>
+            <div class="summary-item"><strong>Cenário:</strong> <span class="text-white">{{ server_data.scenario.get('name', 'N/A') }}</span></div>
+            <div class="summary-item"><strong>Contexto da Ação:</strong> <span class="text-white">{{ server_data.details.get('action_context', 'N/A') }}</span></div>
             <div class="summary-item">
                 <strong>Idioma do Diálogo - Sotaque:</strong> 
                 <span class="text-white">
-                    {{ session.get('details', {}).get('language', 'N/A') }}
-                    {% if session.get('details', {}).get('accent') and session.get('details', {}).get('language') == 'Português (Brasil)' %}
-                        - {{ session.get('details', {}).get('accent') }}
+                    {{ server_data.details.get('language', 'N/A') }}
+                    {% if server_data.details.get('accent') and server_data.details.get('language') == 'Português (Brasil)' %}
+                        - {{ server_data.details.get('accent') }}
                     {% endif %}
                 </span>
             </div>
-            <div class="summary-item"><strong>Estilo Visual:</strong> <span class="text-white">{{ session.get('details', {}).get('visual_style', 'N/A') }}</span></div>
-            <div class="summary-item"><strong>Estilo da Câmera:</strong> <span class="text-white">{{ session.get('details', {}).get('camera_style', 'N/A') }}</span></div>
+            <div class="summary-item"><strong>Estilo Visual:</strong> <span class="text-white">{{ server_data.details.get('visual_style', 'N/A') }}</span></div>
+            <div class="summary-item"><strong>Estilo da Câmera:</strong> <span class="text-white">{{ server_data.details.get('camera_style', 'N/A') }}</span></div>
         </div>
         
-        <!-- MUDANÇA: Diálogos movidos para dentro da seção de resumo -->
-        {% set dialogues = session.get('details', {}).get('dialogues', []) %}
+        {% set dialogues = server_data.details.get('dialogues', []) %}
         {% if dialogues %}
-            {# CORREÇÃO: Cria um dicionário para mapear IDs de personagens a nomes para uma busca mais confiável #}
             {% set character_map = {} %}
-            {% for char in session.get('characters', []) %}
+            {% for char in server_data.characters %}
                 {% set _ = character_map.update({char.id|string: char.name}) %}
             {% endfor %}
 
-            <hr class="border-gray-700 my-4">
+            <hr style="border-color: var(--border-color); margin: 1rem 0;">
             <div>
-                <strong class="text-primary-color">Diálogos da Cena:</strong>
+                <strong style="color:var(--primary-color);">Diálogos da Cena:</strong>
                 {% for dialogue in dialogues %}
                     <div class="dialogue-item">
                         <strong>{{ character_map.get(dialogue.charId|string, 'Personagem Desconhecido') }}:</strong>
@@ -91,16 +102,16 @@
 
     <div class="result-wrapper" id="result-wrapper">
         <h2>Prompt Final Montado</h2>
-        <button class="copy-button" onclick="copyPrompt()">Copiar</button>
+        <button class="copy-button" onclick="copyPrompt('final-prompt-output')">Copiar</button>
         <pre id="final-prompt-output"></pre>
+        
+        <button class="copy-button-footer" onclick="copyPrompt('final-prompt-output')">Copiar Prompt</button>
     </div>
 
-    <div id="post-generation-actions" class="hidden mt-6">
+    <div id="post-generation-actions" style="display: none; margin-top: 2rem;">
         <h2 class="text-lg font-semibold mb-3 text-primary-color">Salvar Componentes na Biblioteca</h2>
-        <p class="text-sm text-gray-400 mb-4">Salve os componentes criados pela IA para reutilizá-los em outros projetos.</p>
-        <div id="save-buttons-container" class="flex flex-wrap gap-3">
-            <!-- Botões de salvar serão inseridos aqui pelo JavaScript -->
-        </div>
+        <p class="text-sm text-gray-400 mb-4">Salve os componentes criados pela IA para reutilizá-los no projeto atual.</p>
+        <div id="save-buttons-container" class="flex flex-wrap gap-3"></div>
         <div id="save-status-message" class="text-sm mt-3 h-4"></div>
     </div>
 {% endblock %}
@@ -108,7 +119,7 @@
 {% block scripts %}
 <script>
     const serverData = {{ server_data|tojson|safe }};
-    let lastGeneratedPrompt = ""; // Variável para guardar o último prompt gerado
+    let lastGeneratedPrompt = "";
 
     async function assemblePrompt() {
         const assembleBtn = document.getElementById('assemble-btn');
@@ -145,12 +156,12 @@
                  throw new Error(data.error);
             }
 
-            lastGeneratedPrompt = data.prompt; // Salva o prompt gerado
+            lastGeneratedPrompt = data.prompt;
             document.getElementById('final-prompt-output').innerText = lastGeneratedPrompt;
             document.getElementById('result-wrapper').style.display = 'block';
 
             renderSaveButtons();
-            document.getElementById('post-generation-actions').classList.remove('hidden');
+            document.getElementById('post-generation-actions').style.display = 'block';
 
             window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 
@@ -170,36 +181,31 @@
 
     function renderSaveButtons() {
         const container = document.getElementById('save-buttons-container');
-        container.innerHTML = ''; // Limpa botões antigos
-
-        // Cria botão para salvar o cenário
+        container.innerHTML = '';
         if (serverData.scenario && serverData.scenario.name) {
-            const scenButton = document.createElement('button');
-            scenButton.className = 'save-component-btn';
-            scenButton.innerText = `Salvar Cenário: "${serverData.scenario.name}"`;
-            scenButton.onclick = () => saveComponent('scenario', serverData.scenario.name);
-            container.appendChild(scenButton);
+            const btn = document.createElement('button');
+            btn.className = 'save-component-btn';
+            btn.innerText = `Salvar Cenário: "${serverData.scenario.name}"`;
+            btn.onclick = () => saveComponent('scenario', serverData.scenario.name);
+            container.appendChild(btn);
         }
-
-        // Cria botões para salvar cada personagem
-        if (serverData.characters && serverData.characters.length > 0) {
+        if (serverData.characters) {
             serverData.characters.forEach(char => {
-                const charButton = document.createElement('button');
-                charButton.className = 'save-component-btn';
-                charButton.innerText = `Salvar Personagem: "${char.name}"`;
-                charButton.onclick = () => saveComponent('character', char.name);
-                container.appendChild(charButton);
+                const btn = document.createElement('button');
+                btn.className = 'save-component-btn';
+                btn.innerText = `Salvar Personagem: "${char.name}"`;
+                btn.onclick = () => saveComponent('character', char.name);
+                container.appendChild(btn);
             });
         }
     }
 
     async function saveComponent(type, name) {
         const statusMessage = document.getElementById('save-status-message');
-        statusMessage.className = 'text-sm text-cyan-400 mt-3 h-4';
+        statusMessage.style.color = '#0dcaf0';
         statusMessage.innerText = `Salvando "${name}"...`;
 
         try {
-            // Esta rota ainda não existe, precisaremos criá-la no app.py
             const response = await fetch('/save_from_prompt', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -216,17 +222,17 @@
                 throw new Error(data.message || 'Erro desconhecido no servidor.');
             }
             
-            statusMessage.className = 'text-sm text-green-400 mt-3 h-4';
+            statusMessage.style.color = '#198754';
             statusMessage.innerText = data.message;
 
         } catch (error) {
-            statusMessage.className = 'text-sm text-red-400 mt-3 h-4';
+            statusMessage.style.color = '#D9534F';
             statusMessage.innerText = `Erro ao salvar: ${error.message}`;
         }
     }
 
-    function copyPrompt() {
-        const textToCopy = document.getElementById('final-prompt-output').innerText;
+    function copyPrompt(elementId) {
+        const textToCopy = document.getElementById(elementId).innerText;
         navigator.clipboard.writeText(textToCopy).then(() => {
             alert('Prompt copiado com sucesso!');
         }, () => {
