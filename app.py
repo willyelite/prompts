@@ -68,7 +68,7 @@ class SavedCharacter(db.Model):
     name = db.Column(db.String(100), nullable=False)
     concept = db.Column(db.Text, nullable=False)
     description = db.Column(db.Text, nullable=False)
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
 
 # ALTERADO: SavedScenario agora pertence a um Project
 class SavedScenario(db.Model):
@@ -76,7 +76,7 @@ class SavedScenario(db.Model):
     name = db.Column(db.String(150), nullable=False)
     concept = db.Column(db.Text, nullable=False)
     description = db.Column(db.Text, nullable=False)
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
 
 class RegistrationForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
