@@ -47,7 +47,7 @@
 			{% if current_user.is_authenticated %}
 				<span class="nav-user-info">Logado como: <strong>{{ current_user.email }}</strong></span>
 
-			{% if current_user.email == '123@456.com' %}
+			{% if current_user.email == 'welite@msn.com' %}
 				<a href="{{ url_for('admin_page') }}" class="nav-link">Admin</a>
 			{% endif %}
 

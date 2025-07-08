@@ -202,7 +202,7 @@ def resumo():
 # --- NOVA SEÇÃO DE ADMIN ---
 
 # Defina aqui o e-mail que terá acesso de administrador
-ADMIN_EMAIL = "123@456.com"
+ADMIN_EMAIL = "welite@msn.com"
 
 # Este é o nosso "filtro" customizado
 def admin_required(f):
