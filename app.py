@@ -270,8 +270,34 @@ def delete_generated_prompt(prompt_id):
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro no servidor: {e}'}), 500
 
-# --- FIM DA SEÇÃO DE ADMIN ---
+# Adicione esta rota na sua seção de admin em app.py
 
+@app.route('/admin/components')
+@login_required
+@admin_required
+def admin_components_page():
+    # Busca todos os componentes
+    all_characters = SavedCharacter.query.order_by(desc(SavedCharacter.id)).all()
+    all_scenarios = SavedScenario.query.order_by(desc(SavedScenario.id)).all()
+    all_projects = Project.query.order_by(desc(Project.id)).all()
+    
+    # NOVO: Cria uma lista de dicionários segura para o JavaScript
+    projects_for_js = []
+    for p in all_projects:
+        projects_for_js.append({
+            'id': p.id,
+            'name': p.name,
+            'user': {'email': p.user.email} # Inclui o email do usuário
+        })
+    
+    # Envia a lista de objetos para o HTML e a lista de dicionários para o JS
+    return render_template('admin_components.html', 
+                           characters=all_characters, 
+                           scenarios=all_scenarios,
+                           projects=all_projects,
+                           projects_for_js=projects_for_js)
+                           
+# --- FIM DA SEÇÃO DE ADMIN ---
 
 # --- ROTAS DA BIBLIOTECA E PROJETOS ---
 # ... (o resto do seu código continua aqui)
@@ -504,7 +530,8 @@ def generate_ia_content(instruction):
     except Exception as e:
         return f"Erro na IA: {e}"
 
-# Em app.py
+
+# Em app.py, dentro da função montar_prompt()
 
 @app.route('/montar-prompt', methods=['POST'])
 @login_required
@@ -533,18 +560,52 @@ def montar_prompt():
     if language == 'Português (Brasil)' and accent and accent not in ['Neutro Brasileiro', '']:
         english_language_instruction += f" with a '{accent}' accent"
 
+    formatted_dialogue_lines = []
+    if details.get('dialogues'):
+        for d in details.get('dialogues', []):
+            dialogue_text = d.get('text')
+            char_name = next((c['name'] for c in characters if str(c['id']) == str(d.get('charId'))), "Character")
+            
+            line_prefix_map = {
+                'Português (Brasil)': 'Portuguese speech',
+                'Inglês': 'English speech',
+                'Espanhol': 'Spanish speech',
+                'Francês': 'French speech',
+                'Alemão': 'German speech',
+                'Japonês': 'Japanese speech',
+                'Italiano': 'Italian speech',
+                'Coreano': 'Korean speech',
+                'Mandarim': 'Mandarin speech'
+            }
+            line_prefix = line_prefix_map.get(language, 'English speech')
+
+            if language == 'Português (Brasil)' and accent and accent not in ['Neutro Brasileiro', '']:
+                line_prefix += f" ({accent.lower()} accent)"
+            
+            formatted_line = f'{char_name} says {line_prefix}: "{dialogue_text}"'
+            formatted_dialogue_lines.append(formatted_line)
+
+    scene_breakdown_string = ""
+    num_scenes = len(formatted_dialogue_lines)
+    if num_scenes > 0:
+        scene_duration = 8.0 / num_scenes
+        scenes_list = []
+        for i, dialogue_line in enumerate(formatted_dialogue_lines):
+            start_time = i * scene_duration
+            end_time = (i + 1) * scene_duration
+            scene_text = f"""
+    Scene {i + 1} ({start_time:.1f}s – {end_time:.1f}s):
+    Action: [Based on the overall Action Context ('{details.get('action_context')}'), describe the specific action for this moment, relevant to the dialogue.]
+    Dialogue: {dialogue_line}
+    Camera: [Describe a camera movement for this scene.]
+    Cinematography: [Describe a technical detail for this scene.]"""
+            scenes_list.append(scene_text)
+        scene_breakdown_string = "".join(scenes_list)
+    
     character_concepts = "\n".join([f"- Character Concept for '{c.get('name')}': {c.get('description')}" for c in characters])
     scenario_concept = f"- Scenario Concept for '{scenario.get('name')}': {scenario.get('description')}"
-    
-    dialogue_lines_pt_br = []
-    if details.get('dialogues'):
-      for d in details.get('dialogues', []):
-          char_name = next((c['name'] for c in characters if str(c['id']) == str(d.get('charId'))), "Character")
-          dialogue_lines_pt_br.append(f"- {char_name}: \"{d.get('text')}\"")
-          
     safe_scenario_name = scenario.get('name', 'default').replace(' ', '_')
 
-    # A principal mudança está aqui, no texto do prompt final
     final_assembly_instruction = f"""
     You are a professional prompt engineer. Your only task is to generate a complete video prompt by precisely following the structure and rules below.
     
@@ -552,65 +613,56 @@ def montar_prompt():
     Action Context: "{details.get('action_context')}"
     Visual Style: "{details.get('visual_style')}"
     Camera Style: "{details.get('camera_style')}"
+    language: "{details.get('language')}"
+    accent: "{details.get('accent')}"
     Character Concepts:
       {character_concepts}
     Scenario Concept:
       {scenario_concept}
-    Dialogue Sequence (to be translated to {english_language_instruction}):
-      {"\n".join(dialogue_lines_pt_br) if dialogue_lines_pt_br else "No dialogue provided."}
 
-    **GENERATION TASK - Follow this structure EXACTLY:**
+    **GENERATION TASK - Follow this structure EXACTLY do not add any sentences before the Prompt Title:**
 
     Prompt Title:
     [Generate a 1-3 word title in ENGLISH based on the Action Context]
     Initial AI Instructions:
-    Visual Style: {details.get('visual_style')} Camera Style: {details.get('camera_style')} Language: {english_language_instruction} with perfect lip-sync.
-    {"\n---\n\n".join([f'''👤 Character Profile: {c.get('name')}
-    <char_{c.get('name').replace(' ', '_')}_start>
-[Based on the core concept '{c.get('description')}', expand the character details below. The core concept is non-negotiable.
-*Archetype/Celebrity Look:* [Describe a mix of 2-3 real celebrities or well-known archetypes that define the character's face and build. Be specific, e.g., "Face like a young Mads Mikkelsen, body of a lean marathon runner", "Look of Eva Green mixed with Cate Blanchett". This is the most important anchor for consistency.]
-*Physical Details:*
-[Character's gender], [Apparent age, e.g., early 30s], [Character's ethnicity], [Height in meters, and body type like 'ectomorph', 'mesomorph', 'endomorph', 'lean', 'muscular'],Skin Tone [Detailed skin color, e.g., 'pale with cool undertones', 'olive skin', 'deep brown with warm undertones'].
-Face [e.g., Oval, Round, Square, Heart-shaped], [e.g., Sharp jawline, soft chin; Defined jawline, square chin], Cheekbones [e.g., High and prominent, subtle] Forehead [e.g., Broad, narrow].
-Eyes Color [e.g., Dark Brown, Ice Blue, Emerald Green], Shape [e.g., Almond, Hooded, Round, Downturned], Eyebrows [e.g., Thick and straight, thin and arched].
-Nose Shape [e.g., Straight, Roman, snub, aquiline].
-Mouth Lip Shape [e.g., Full lips, thin lips, defined Cupid's bow].
-Hair Color [e.g., Jet Black, Platinum Blonde, Auburn, Salt-and-pepper], [e.g., 'Fine and straight, styled in a bob cut', 'Thick 4C curls in a high puff', 'Wavy and shoulder-length']
-[List all unique and non-negotiable features like scars over an eye, specific tattoos on neck or face, piercings, etc. Be precise.]
-</char_{c.get('name').replace(' ', '_')}_end>
-Attire: [Describe what this character is wearing in this specific scene.] Posture: [Describe their posture in this scene (e.g., leaning forward, arms crossed).] Facial Expression: [Describe their facial expression in this scene (e.g., a faint smile, a worried frown).]
-''' for c in characters])}
+    Visual Style: {details.get('visual_style')}
+    Camera Style: {details.get('camera_style')}
     
-    Scene Breakdown:
-    [Your task is to create a scene breakdown based on the provided dialogue and action context.
-    - The total duration of all scenes combined MUST be exactly 8 seconds.
-    - Based on the user's data, decide if the story is better told in ONE or TWO scenes.
-    - Allocate the 8 seconds appropriately between the scenes you create. For example, one 8-second scene, or a 5s and a 3s scene.
-    - For each scene you create, you MUST provide all the following fields: Scene number with your calculated timing, Action, Dialogue, Camera, and Cinematography.
-    - For the Dialogue field, if the target language is Portuguese, use the original dialogue. If it is another language, translate the dialogue. Use the provided lines in order. If there is only one dialogue line, you can create one long scene or two scenes where only the first has dialogue.]
-
+    {"\n---\n\n".join([f'''👤 Character Profile: {c.get('name')}
+<char_{c.get('name').replace(' ', '_')}_start>
+    [Your task is to provide a highly detailed description for the character based on the core concept: '{c.get('description')}'. You MUST generate original, descriptive text for every single field listed below. Do NOT simply repeat the core concept. Fill in all fields.]
+    *Archetype/Celebrity Look:* [Describe a mix of 2-3 real celebrities or well-known archetypes that define the character's face and build. Be specific, e.g., "Face like a young Mads Mikkelsen, body of a lean marathon runner", "Look of Eva Green mixed with Cate Blanchett". This is the most important anchor for consistency.]
+    *Physical Details:*
+    [Character's gender], [Apparent age, e.g., early 30s], [Character's ethnicity], [Height in meters, and body type like 'ectomorph', 'mesomorph', 'endomorph', 'lean', 'muscular'],Skin Tone [Detailed skin color, e.g., 'pale with cool undertones', 'olive skin', 'deep brown with warm undertones'].
+    Face [e.g., Oval, Round, Square, Heart-shaped], [e.g., Sharp jawline, soft chin; Defined jawline, square chin], Cheekbones [e.g., High and prominent, subtle] Forehead [e.g., Broad, narrow].
+    Eyes Color [e.g., Dark Brown, Ice Blue, Emerald Green], Shape [e.g., Almond, Hooded, Round, Downturned], Eyebrows [e.g., Thick and straight, thin and arched].
+    Nose Shape [e.g., Straight, Roman, snub, aquiline].
+    Mouth Lip Shape [e.g., Full lips, thin lips, defined Cupid's bow].
+    Hair Color [e.g., Jet Black, Platinum Blonde, Auburn, Salt-and-pepper], [e.g., 'Fine and straight, styled in a bob cut', 'Thick 4C curls in a high puff', 'Wavy and shoulder-length']
+    [List all unique and non-negotiable features like scars over an eye, specific tattoos on neck or face, piercings, etc. Be precise.]
+</char_{c.get('name').replace(' ', '_')}_end>
+    Attire: [Describe what this character is wearing in this specific scene.] Posture: [Describe their posture in this scene (e.g., leaning forward, arms crossed).] Facial Expression: [Describe their facial expression in this scene (e.g., a faint smile, a worried frown).]
+''' for c in characters])}
+    Scene Breakdown:{scene_breakdown_string}
     Scene Setup:
-    <scen_{safe_scenario_name}_start>
+<scen_{safe_scenario_name}_start>
     Location: [Expand the Scenario Concept into a detailed description of the location.] Lighting: [Describe the lighting of the scene.] Atmosphere: [Describe the atmosphere, sounds, and smells.]
-    </scen_{safe_scenario_name}_end>
-    Instructions Final for IA:
-    Visual Style: {details.get('visual_style')} Color Grading: [Describe a color grading style.] Duration: 8 seconds. Language: {english_language_instruction} with perfect lip-sync. Audio: [Describe the audio mix.] Output: No watermarks, no subtitles.
+</scen_{safe_scenario_name}_end>
+    No subtitles
+    No artificial overlays
+    No visual bugs
     """
     final_prompt = generate_ia_content(final_assembly_instruction)
-    # --- NOVO CÓDIGO PARA SALVAR O PROMPT ---
+    
     if final_prompt and not final_prompt.startswith("Erro"):
         try:
-            new_prompt_log = GeneratedPrompt(
-                prompt_text=final_prompt,
-                user_id=current_user.id
-            )
+            new_prompt_log = GeneratedPrompt(prompt_text=final_prompt, user_id=current_user.id)
             db.session.add(new_prompt_log)
             db.session.commit()
         except Exception as e:
-            # Se o salvamento falhar, não quebra a aplicação, apenas registra no log do servidor
             print(f"Erro ao salvar log de prompt: {e}")
             db.session.rollback()
-    # --- FIM DO NOVO CÓDIGO ---
+
     return jsonify({'prompt': final_prompt})
 
 

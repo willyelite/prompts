@@ -39,21 +39,32 @@
         color: #aeb9c5;
         font-size: 1.1rem;
     }
+
+    /* --- ESTILOS ATUALIZADOS PARA OS LINKS --- */
+    .admin-links {
+        display: flex; /* Alinha os itens lado a lado */
+        gap: 1rem; /* Espaçamento entre os links */
+        flex-wrap: wrap; /* Permite que quebrem a linha em telas pequenas */
+    }
     .admin-links a {
-        display: block;
-        margin-bottom: 0.5rem;
         color: var(--primary-color);
         text-decoration: none;
         font-weight: 500;
+        padding: 10px 20px; /* Deixa com aparência de botão */
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        transition: background-color 0.2s ease;
     }
     .admin-links a:hover {
-        text-decoration: underline;
+        background-color: var(--border-color);
+        text-decoration: none;
     }
+    /* --- FIM DOS ESTILOS ATUALIZADOS --- */
 </style>
 
 <div class="admin-panel">
     <h1>Painel Administrativo</h1>
-
+    <p><a href="{{ url_for('biblioteca') }}">&larr; Sair do Modo Admin e Voltar para a Biblioteca</a></p>
     <div class="stats-grid">
         <div class="stat-card">
             <h2>{{ user_count }}</h2>
@@ -80,8 +91,9 @@
     <hr style="border-color: var(--border-color); margin: 2rem 0;">
 
     <div class="admin-links">
-        <p><a href="{{ url_for('list_users_page') }}">Ver Lista Detalhada de Usuários</a></p>
-        <p><a href="{{ url_for('admin_prompts_page') }}">Ver Log de Todos os Prompts</a></p>
+        <a href="{{ url_for('list_users_page') }}">Ver Lista de Usuários</a>
+        <a href="{{ url_for('admin_prompts_page') }}">Ver Log de Prompts</a>
+        <a href="{{ url_for('admin_components_page') }}">Ver Todos os Componentes</a>
     </div>
 </div>
 {% endblock %}

@@ -1,0 +1,127 @@
+{% extends "layout.html" %}
+
+{% block title %}Admin - Todos os Componentes{% endblock %}
+
+{% block head_styles %}
+<style>
+    .admin-container { padding: 2rem; }
+    .admin-container h1 { color: var(--primary-color); }
+    .components-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+        margin-top: 2rem;
+    }
+    .component-list h2 {
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.5rem;
+    }
+    .component-item {
+        background-color: var(--surface-color);
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        border: 1px solid var(--border-color);
+    }
+    .component-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .component-header h3 { margin: 0; }
+    .component-meta { font-size: 0.85rem; color: #aeb9c5; }
+    .component-description {
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--border-color);
+        white-space: pre-wrap;
+        font-size: 0.9rem;
+    }
+    .action-btn { font-size: 0.8rem; padding: 5px 10px; background-color: transparent; border: 1px solid; border-radius: 5px; cursor: pointer; transition: all 0.2s; margin-left: 5px; }
+    .copy-btn { border-color: var(--info-color); color: var(--info-color); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <h1>Admin: Todos os Personagens e Cenários</h1>
+    <p><a href="{{ url_for('admin_page') }}">&larr; Voltar ao Painel Principal</a></p>
+
+    <div class="components-grid">
+        <div class="component-list">
+            <h2>Todos os Personagens</h2>
+            {% for char in characters %}
+            <div class="component-item">
+                <div class="component-header">
+                    <div>
+                        <h3>{{ char.name }}</h3>
+                        <p class="component-meta">
+                            <strong>Usuário:</strong> {{ char.project.user.email }} | 
+                            <strong>Projeto:</strong> {{ char.project.name }} (ID: {{ char.project.id }})
+                        </p>
+                    </div>
+                    <button class="action-btn copy-btn" onclick="copyCharacter({{ char.id }}, '{{ char.name | e }}')">Copiar</button>
+                </div>
+                <div class="component-description">
+                    {{ char.description }}
+                </div>
+            </div>
+            {% else %}
+            <p>Nenhum personagem salvo no site.</p>
+            {% endfor %}
+        </div>
+
+        <div class="component-list">
+            <h2>Todos os Cenários</h2>
+            {% for scen in scenarios %}
+            <div class="component-item">
+                 <div class="component-header">
+                    <div>
+                        <h3>{{ scen.name }}</h3>
+                        <p class="component-meta">
+                            <strong>Usuário:</strong> {{ scen.project.user.email }} | 
+                            <strong>Projeto:</strong> {{ scen.project.name }} (ID: {{ scen.project.id }})
+                        </p>
+                    </div>
+                    </div>
+                <div class="component-description">
+                    {{ scen.description }}
+                </div>
+            </div>
+            {% else %}
+            <p>Nenhum cenário salvo no site.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Passa a lista de todos os projetos para o JavaScript
+const allProjects = {{ projects_for_js|tojson|safe }};
+
+async function copyCharacter(characterId, characterName) {
+    const projectOptions = allProjects.map(p => `ID: ${p.id} - Nome: ${p.name} (Usuário: ${p.user.email})`).join('\n');
+    const destProjectId = prompt(
+        `Para qual projeto você quer copiar "${characterName}"?\n\nDigite o ID do projeto de destino:\n\n${projectOptions}`
+    );
+
+    if (!destProjectId) { return; }
+    if (isNaN(destProjectId) || destProjectId.trim() === '') {
+        alert('Por favor, digite um ID numérico válido.');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/character/${characterId}/copy_to/${destProjectId}`, { method: 'POST' });
+        const data = await response.json();
+        if (!response.ok) { throw new Error(data.message || 'Erro do servidor.'); }
+        alert(data.message);
+        // Não recarrega a página para não perder a posição da rolagem
+    } catch (error) {
+        alert('Erro ao copiar: ' + error.message);
+    }
+}
+</script>
+{% endblock %}
