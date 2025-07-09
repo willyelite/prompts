@@ -620,7 +620,7 @@ def montar_prompt():
     Scenario Concept:
       {scenario_concept}
 
-    **GENERATION TASK - Follow this structure EXACTLY do not add any sentences before the Prompt Title:**
+    **GENERATION TASK - Follow this structure EXACTLY:**
 
     Prompt Title:
     [Generate a 1-3 word title in ENGLISH based on the Action Context]
@@ -629,7 +629,8 @@ def montar_prompt():
     Camera Style: {details.get('camera_style')}
     
     {"\n---\n\n".join([f'''👤 Character Profile: {c.get('name')}
-<char_{c.get('name').replace(' ', '_')}_start>
+
+    <char_{c.get('name').replace(' ', '_')}_start>
     [Your task is to provide a highly detailed description for the character based on the core concept: '{c.get('description')}'. You MUST generate original, descriptive text for every single field listed below. Do NOT simply repeat the core concept. Fill in all fields.]
     *Archetype/Celebrity Look:* [Describe a mix of 2-3 real celebrities or well-known archetypes that define the character's face and build. Be specific, e.g., "Face like a young Mads Mikkelsen, body of a lean marathon runner", "Look of Eva Green mixed with Cate Blanchett". This is the most important anchor for consistency.]
     *Physical Details:*
@@ -640,7 +641,8 @@ def montar_prompt():
     Mouth Lip Shape [e.g., Full lips, thin lips, defined Cupid's bow].
     Hair Color [e.g., Jet Black, Platinum Blonde, Auburn, Salt-and-pepper], [e.g., 'Fine and straight, styled in a bob cut', 'Thick 4C curls in a high puff', 'Wavy and shoulder-length']
     [List all unique and non-negotiable features like scars over an eye, specific tattoos on neck or face, piercings, etc. Be precise.]
-</char_{c.get('name').replace(' ', '_')}_end>
+    </char_{c.get('name').replace(' ', '_')}_end>
+
     Attire: [Describe what this character is wearing in this specific scene.] Posture: [Describe their posture in this scene (e.g., leaning forward, arms crossed).] Facial Expression: [Describe their facial expression in this scene (e.g., a faint smile, a worried frown).]
 ''' for c in characters])}
     Scene Breakdown:{scene_breakdown_string}
