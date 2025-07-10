@@ -22,20 +22,6 @@
     .result-wrapper { margin-top: 2rem; background-color: #101820; border-radius: 8px; padding: 1.5rem; position: relative; display: none; }
     #final-prompt-output { white-space: pre-wrap; line-height: 1.7; font-family: monospace; }
     .copy-button { position: absolute; top: 1rem; right: 1rem; background-color: var(--primary-color); color: var(--button-text-dark); border: none; border-radius: 5px; padding: 8px 12px; cursor: pointer; font-weight: 500; }
-    .save-component-btn {
-        background-color: var(--info-color);
-        color: white;
-        padding: 8px 16px;
-        border: none;
-        border-radius: 8px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: background-color 0.2s ease;
-    }
-    .save-component-btn:hover {
-        background-color: #0aa2c0;
-    }
-    /* Estilo para o botão de cópia no rodapé */
     .copy-button-footer {
         display: block;
         width: fit-content;
@@ -48,6 +34,30 @@
         padding: 8px 12px;
         cursor: pointer;
         font-weight: 500;
+    }
+    #post-generation-actions {
+        display: none; 
+        margin-top: 2rem;
+        border: 2px solid var(--success-color);
+        border-radius: 8px;
+        padding: 1.5rem;
+    }
+    #post-generation-actions h2 {
+        margin-top: 0;
+    }
+    .save-component-btn {
+        background-color: var(--info-color);
+        color: white;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        margin-top: 0.5rem;
+    }
+    .save-component-btn:hover {
+        background-color: #0aa2c0;
     }
 </style>
 {% endblock %}
@@ -104,13 +114,12 @@
         <h2>Prompt Final Montado</h2>
         <button class="copy-button" onclick="copyPrompt('final-prompt-output')">Copiar</button>
         <pre id="final-prompt-output"></pre>
-        
         <button class="copy-button-footer" onclick="copyPrompt('final-prompt-output')">Copiar Prompt</button>
     </div>
 
-    <div id="post-generation-actions" style="display: none; margin-top: 2rem;">
-        <h2 class="text-lg font-semibold mb-3 text-primary-color">Salvar Componentes na Biblioteca</h2>
-        <p class="text-sm text-gray-400 mb-4">Salve os componentes criados pela IA para reutilizá-los no projeto atual.</p>
+    <div id="post-generation-actions">
+        <h2>⭐ Salvar Componentes</h2>
+        <p id="save-initial-message">Salve os componentes criados pela IA em sua biblioteca para reutilizá-los facilmente no futuro!</p>
         <div id="save-buttons-container" class="flex flex-wrap gap-3"></div>
         <div id="save-status-message" class="text-sm mt-3 h-4"></div>
     </div>
@@ -121,85 +130,7 @@
     const serverData = {{ server_data|tojson|safe }};
     let lastGeneratedPrompt = "";
 
-    async function assemblePrompt() {
-        const assembleBtn = document.getElementById('assemble-btn');
-        assembleBtn.disabled = true;
-        assembleBtn.innerText = 'Montando... (Pode levar até 1 min)';
-
-        const payload = {
-            characters: serverData.characters || [],
-            scenario: serverData.scenario || {},
-            details: serverData.details || {}
-        };
-
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000);
-
-            const response = await fetch("{{ url_for('montar_prompt') }}", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `Erro do servidor: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            if (data.error) {
-                 throw new Error(data.error);
-            }
-
-            lastGeneratedPrompt = data.prompt;
-            document.getElementById('final-prompt-output').innerText = lastGeneratedPrompt;
-            document.getElementById('result-wrapper').style.display = 'block';
-
-            renderSaveButtons();
-            document.getElementById('post-generation-actions').style.display = 'block';
-
-            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-
-        } catch (error) {
-            let errorMessage = 'Ocorreu um erro desconhecido.';
-            if (error.name === 'AbortError') {
-                errorMessage = 'A requisição demorou muito e foi cancelada. Tente novamente.';
-            } else {
-                errorMessage = error.message;
-            }
-            alert(`Erro ao montar o prompt: ${errorMessage}`);
-        } finally {
-            assembleBtn.disabled = false;
-            assembleBtn.innerText = 'Montar Prompt Final com IA';
-        }
-    }
-
-    function renderSaveButtons() {
-        const container = document.getElementById('save-buttons-container');
-        container.innerHTML = '';
-        if (serverData.scenario && serverData.scenario.name) {
-            const btn = document.createElement('button');
-            btn.className = 'save-component-btn';
-            btn.innerText = `Salvar Cenário: "${serverData.scenario.name}"`;
-            btn.onclick = () => saveComponent('scenario', serverData.scenario.name);
-            container.appendChild(btn);
-        }
-        if (serverData.characters) {
-            serverData.characters.forEach(char => {
-                const btn = document.createElement('button');
-                btn.className = 'save-component-btn';
-                btn.innerText = `Salvar Personagem: "${char.name}"`;
-                btn.onclick = () => saveComponent('character', char.name);
-                container.appendChild(btn);
-            });
-        }
-    }
-
+    // Função para salvar um único componente
     async function saveComponent(type, name) {
         const statusMessage = document.getElementById('save-status-message');
         statusMessage.style.color = '#0dcaf0';
@@ -228,6 +159,113 @@
         } catch (error) {
             statusMessage.style.color = '#D9534F';
             statusMessage.innerText = `Erro ao salvar: ${error.message}`;
+            // Re-throw para que o Promise.all saiba que falhou
+            throw error;
+        }
+    }
+
+    // Função para salvar todos os componentes de uma vez
+    async function saveAllComponents() {
+        const statusMessage = document.getElementById('save-status-message');
+        if (!statusMessage) return;
+
+        statusMessage.innerText = 'Salvando todos os componentes...';
+        statusMessage.style.color = '#0dcaf0';
+        document.getElementById('save-initial-message').style.display = 'none';
+        document.getElementById('save-buttons-container').innerHTML = ''; // Limpa botões manuais
+        
+        const savePromises = [];
+        if (serverData.scenario && serverData.scenario.name) {
+            savePromises.push(saveComponent('scenario', serverData.scenario.name));
+        }
+        if (serverData.characters) {
+            serverData.characters.forEach(char => {
+                savePromises.push(saveComponent('character', char.name));
+            });
+        }
+
+        try {
+            await Promise.all(savePromises);
+            statusMessage.style.color = '#198754';
+            statusMessage.innerText = 'Todos os componentes foram salvos com sucesso no seu projeto!';
+        } catch (error) {
+            // A mensagem de erro individual já foi definida pela função saveComponent
+            // Apenas adicionamos um cabeçalho geral
+            statusMessage.innerText = 'Ocorreu um erro durante o salvamento. ' + error.message;
+        }
+    }
+
+    // Função para renderizar os botões manuais
+    function renderSaveButtons() {
+        const container = document.getElementById('save-buttons-container');
+        const statusMessage = document.getElementById('save-status-message');
+        container.innerHTML = ''; // Limpa qualquer conteúdo anterior
+        statusMessage.innerText = ''; // Limpa mensagens de status
+        document.getElementById('save-initial-message').style.display = 'block';
+
+        if (serverData.scenario && serverData.scenario.name) {
+            const btn = document.createElement('button');
+            btn.className = 'save-component-btn';
+            btn.innerText = `Salvar Cenário: "${serverData.scenario.name}"`;
+            btn.onclick = () => saveComponent('scenario', serverData.scenario.name);
+            container.appendChild(btn);
+        }
+        if (serverData.characters) {
+            serverData.characters.forEach(char => {
+                const btn = document.createElement('button');
+                btn.className = 'save-component-btn';
+                btn.innerText = `Salvar Personagem: "${char.name}"`;
+                btn.onclick = () => saveComponent('character', char.name);
+                container.appendChild(btn);
+            });
+        }
+    }
+
+    // Função principal, com a lógica de popup corrigida
+    async function assemblePrompt() {
+        const assembleBtn = document.getElementById('assemble-btn');
+        assembleBtn.disabled = true;
+        assembleBtn.innerText = 'Montando... (Pode levar até 1 min)';
+        
+        document.getElementById('post-generation-actions').style.display = 'none';
+
+        try {
+            const response = await fetch("{{ url_for('montar_prompt') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    characters: serverData.characters || [],
+                    scenario: serverData.scenario || {},
+                    details: serverData.details || {}
+                })
+            });
+            
+            if (!response.ok) throw new Error((await response.json()).message || 'Erro do servidor');
+            
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+
+            lastGeneratedPrompt = data.prompt;
+            document.getElementById('final-prompt-output').innerText = lastGeneratedPrompt;
+            document.getElementById('result-wrapper').style.display = 'block';
+            
+            document.getElementById('post-generation-actions').style.display = 'block';
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+
+            // --- LÓGICA DO POPUP CORRIGIDA ---
+            const wantsToSave = confirm("Deseja salvar os componentes (personagens e cenário) criados pela IA para este projeto?");
+            if (wantsToSave) {
+                saveAllComponents();
+            } else {
+                // Se o usuário cancelar, renderiza os botões manuais como alternativa
+                renderSaveButtons();
+            }
+
+        } catch (error) {
+            alert(`Erro ao montar o prompt: ${error.message}`);
+        } finally {
+            assembleBtn.disabled = false;
+            assembleBtn.innerText = 'Montar Prompt Final com IA';
         }
     }
 

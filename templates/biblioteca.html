@@ -79,6 +79,12 @@
     <div class="project-card" id="project-card-{{ project.id }}">
         <div class="project-header project-toggle-header">
             <h3>{{ project.name }}</h3>
+			<button 
+            type="button" 
+            class="action-btn delete-btn" 
+            onclick="event.stopPropagation(); deleteProject({{ project.id }})">
+            Apagar Projeto
+			</button>
         </div>
         <div class="collapsible-content">
             <form action="{{ url_for('carregar_da_biblioteca') }}" method="POST">
@@ -143,6 +149,8 @@
             </div>
         </div>
     </div>
+	
+	
 {% endblock %}
 
 
@@ -257,6 +265,24 @@
             alert(data.message);
             window.location.reload();
         } catch (error) { alert('Erro ao copiar: ' + error.message); }
+    }
+	
+	async function deleteProject(projectId) {
+		const confirmation = confirm("Atenção! Tem certeza que deseja apagar este projeto? Todos os personagens e cenários dentro dele serão perdidos para sempre. Esta ação não pode ser desfeita.");
+
+		if (confirmation) {
+			// Envia a requisição para o backend
+			const response = await fetch(`/project/${projectId}/delete`, { method: 'POST' });
+			const data = await response.json();
+
+        if (data.success) {
+            // Remove o card do projeto da tela
+            document.getElementById(`project-card-${projectId}`).remove();
+            alert('Projeto apagado com sucesso.');
+        } else {
+            alert('Erro ao apagar o projeto: ' + data.message);
+			}
+		}
     }
 </script>
 {% endblock %}

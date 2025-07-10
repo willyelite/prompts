@@ -297,6 +297,19 @@ def admin_components_page():
                            projects=all_projects,
                            projects_for_js=projects_for_js)
                            
+@app.route('/propaganda')
+@login_required
+@admin_required  # já existe e usa o ADMIN_EMAIL
+def propaganda_page():
+    return render_template('propaganda.html')
+
+@app.route('/upload-imagem', methods=['POST'])
+@login_required
+@admin_required
+def upload_imagem():
+    return jsonify({'mensagem': 'Rota protegida funcionando!'})
+
+
 # --- FIM DA SEÇÃO DE ADMIN ---
 
 # --- ROTAS DA BIBLIOTECA E PROJETOS ---
@@ -443,7 +456,26 @@ def copy_character(character_id, project_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'Erro no servidor: {e}'}), 500
-        
+      
+@app.route('/project/<int:project_id>/delete', methods=['POST'])
+@login_required
+def delete_project(project_id):
+    project_to_delete = db.session.get(Project, project_id)
+
+    # Validação de segurança
+    if not project_to_delete:
+        return jsonify({'success': False, 'message': 'Projeto não encontrado.'}), 404
+    if project_to_delete.user_id != current_user.id:
+        return jsonify({'success': False, 'message': 'Não autorizado.'}), 403
+
+    try:
+        db.session.delete(project_to_delete)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro no servidor: {e}'}), 500
+      
         # Adicione esta nova rota em app.py
 
 @app.route('/component/<string:component_type>/<int:component_id>/edit', methods=['POST'])

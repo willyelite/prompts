@@ -1,0 +1,30 @@
+{% extends "layout.html" %}
+
+{% block title %}Ferramentas de Propaganda (Somente Admin){% endblock %}
+
+{% block content %}
+<h1>Laboratório de <span>Propaganda</span></h1>
+<p style="color: #aeb9c5;">Apenas você pode ver essa página.</p>
+
+<hr style="margin: 2rem 0;">
+
+<h2>Gerar Descrição de Imagem</h2>
+<form id="form-upload-imagem" enctype="multipart/form-data">
+    <input type="file" name="imagem" required>
+    <button type="submit" class="small-button" style="margin-left: 1rem;">Enviar</button>
+</form>
+<p id="resultado-descricao" style="margin-top: 1rem; color: var(--primary-color); font-weight: bold;"></p>
+
+<script>
+document.getElementById('form-upload-imagem').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const res = await fetch('/upload-imagem', {
+        method: 'POST',
+        body: formData
+    });
+    const data = await res.json();
+    document.getElementById('resultado-descricao').innerText = data.descricao || data.erro;
+});
+</script>
+{% endblock %}
